@@ -44,7 +44,12 @@
 @theme {
   /* Brand Colors - Black & White Minimalist */
   --color-primary: #ffffff; /* White - main brand color, primary CTAs */
-  --color-primary-hover: rgba(255, 255, 255, 0.8); /* Dimmed white - hover state */
+  --color-primary-hover: rgba(
+    255,
+    255,
+    255,
+    0.8
+  ); /* Dimmed white - hover state */
   --color-secondary: #a0a0a0; /* Gray - secondary actions */
   --color-secondary-hover: #ffffff; /* White - hover state */
   --color-accent: #ffffff; /* White - highlights, special emphasis */
@@ -90,18 +95,21 @@ body {
 /* Glass Morphism Utilities */
 .glass-light {
   background: var(--glass-light);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
   border: 1px solid var(--glass-border);
 }
 
 .glass-medium {
-  background: var(--glass-medium);
-  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid var(--glass-border);
 }
 
 .glass-dark {
   background: var(--glass-dark);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
   border: 1px solid var(--glass-border);
 }
