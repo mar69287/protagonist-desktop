@@ -1,142 +1,134 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Zap, Shield, Rocket, Code, TrendingUp, Users } from "lucide-react";
-import HeroSection from "@/components/sections/HeroSection";
-import FeatureBlob from "@/components/ui/FeatureBlob";
-import StatWave from "@/components/ui/StatWave";
-import Button from "@/components/ui/Button";
-
-const features = [
-  {
-    icon: Zap,
-    title: "Lightning Fast",
-    description:
-      "Built for speed with cutting-edge technology and optimized performance.",
-    color: "var(--color-accent)", // Accent yellow
-  },
-  {
-    icon: Shield,
-    title: "Secure by Default",
-    description:
-      "Enterprise-grade security to keep your data safe and protected.",
-    color: "var(--color-secondary)", // Secondary green
-  },
-  {
-    icon: Rocket,
-    title: "Scale Infinitely",
-    description:
-      "Grow without limits. Our platform scales with your business needs.",
-    color: "var(--color-info)", // Info cyan
-  },
-  {
-    icon: Code,
-    title: "Developer First",
-    description: "Beautiful APIs and tools designed for modern developers.",
-    color: "var(--color-primary)", // Primary orange
-  },
-];
-
-const stats = [
-  { value: "99.9%", label: "Uptime", icon: TrendingUp },
-  { value: "10M+", label: "Users", icon: Users },
-  { value: "50K+", label: "Projects", icon: Code },
-];
+import { Target, TrendingUp, Award } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="">
-      <HeroSection />
-
-      {/* Stats Section - Diagonal Split Design */}
-      <section className="relative py-32 px-4 sm:px-6 lg:px-8 overflow-hidden bg-neutral-800">
-        <div className="max-w-7xl mx-auto relative z-10">
-          <motion.div
-            className="grid grid-cols-1 md:grid-cols-3 gap-8"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-          >
-            {stats.map((stat, index) => (
-              <StatWave
-                key={stat.label}
-                value={stat.value}
-                label={stat.label}
-                icon={stat.icon}
-                index={index}
-              />
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Features Section - Flowing Layout */}
-      <section className="relative py-32 px-4 sm:px-6 lg:px-8 bg-background">
-        <div className="max-w-7xl mx-auto relative z-10">
+    <div className="min-h-screen bg-black">
+      {/* Hero Section */}
+      <section className="relative px-4 sm:px-6 lg:px-8 pt-32 pb-20">
+        <div className="max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-20"
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
           >
-            <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 text-white">
-              Powerful Capabilities
-            </h2>
-            <p className="text-xl text-neutral-300 max-w-2xl mx-auto">
-              Everything you need to build and scale your next big idea
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold text-white mb-6">
+              Protagonist
+            </h1>
+            <p className="text-xl sm:text-2xl text-[#a0a0a0] mb-4">
+              Get Paid to Accomplish Your Goals
             </p>
-          </motion.div>
-
-          {/* Unique flowing grid layout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className={index === 0 || index === 3 ? "lg:col-span-2" : ""}
-              >
-                <FeatureBlob
-                  icon={feature.icon}
-                  title={feature.title}
-                  description={feature.description}
-                  color={feature.color}
-                  index={index}
-                />
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section - Unique Split Design */}
-      <section className="relative py-32 px-4 sm:px-6 lg:px-8 overflow-hidden bg-neutral-800">
-        <div className="max-w-5xl mx-auto text-center relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="space-y-8"
-          >
-            <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white">
-              Ready to Transform Your Vision?
-            </h2>
-            <p className="text-xl text-neutral-300 max-w-2xl mx-auto">
-              Join thousands of developers and businesses already building with
-              our platform
+            <p className="text-base sm:text-lg text-[#a0a0a0] max-w-2xl mx-auto mb-12">
+              Transform your aspirations into achievements with accountability
+              that matters. Set goals, commit to them, and earn rewards as you
+              succeed.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-              <Button href="/contact" size="lg" showArrow>
-                Start Building Now
-              </Button>
-              <Button href="/about" variant="secondary" size="lg">
-                Explore Features
-              </Button>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link href="/login">
+                <motion.button
+                  className="px-8 py-4 bg-white text-black font-semibold rounded-xl hover:bg-[#f5f5f5] transition-colors w-full sm:w-auto"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Log In
+                </motion.button>
+              </Link>
+              <Link href="/subscriptions/signup">
+                <motion.button
+                  className="px-8 py-4 glass-light text-white font-semibold rounded-xl hover:bg-[rgba(255,255,255,0.15)] transition-colors w-full sm:w-auto"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Get Started
+                </motion.button>
+              </Link>
             </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="relative px-4 sm:px-6 lg:px-8 py-20">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-8"
+          >
+            {/* Feature 1 */}
+            <div className="glass-light rounded-2xl p-8 hover:bg-[rgba(255,255,255,0.15)] transition-colors">
+              <Target className="w-12 h-12 text-white mb-4" />
+              <h3 className="text-xl font-semibold text-white mb-3">
+                Define Your Goals
+              </h3>
+              <p className="text-[#a0a0a0]">
+                Interactive chat-based onboarding guides you through setting
+                meaningful, achievable goals.
+              </p>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="glass-light rounded-2xl p-8 hover:bg-[rgba(255,255,255,0.15)] transition-colors">
+              <Award className="w-12 h-12 text-white mb-4" />
+              <h3 className="text-xl font-semibold text-white mb-3">
+                Commit & Sign
+              </h3>
+              <p className="text-[#a0a0a0]">
+                Create a commitment contract that holds you accountable to your
+                aspirations.
+              </p>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="glass-light rounded-2xl p-8 hover:bg-[rgba(255,255,255,0.15)] transition-colors">
+              <TrendingUp className="w-12 h-12 text-white mb-4" />
+              <h3 className="text-xl font-semibold text-white mb-3">
+                Track & Earn
+              </h3>
+              <p className="text-[#a0a0a0]">
+                Monitor your progress and get rewarded as you accomplish your
+                committed goals.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* About Section */}
+      <section className="relative px-4 sm:px-6 lg:px-8 py-20">
+        <div className="max-w-3xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="glass-light rounded-2xl p-10 text-center"
+          >
+            <h2 className="text-3xl font-bold text-white mb-4">
+              Your Journey Starts Here
+            </h2>
+            <p className="text-lg text-[#a0a0a0] mb-6">
+              Protagonist is a mobile app available on iOS and Android that
+              combines goal-setting psychology with financial incentives. Define
+              what matters, commit to your plan, and let us help you become the
+              protagonist of your own success story.
+            </p>
+            <Link href="/subscriptions/signup">
+              <motion.button
+                className="px-6 py-3 bg-white text-black font-semibold rounded-xl hover:bg-[#f5f5f5] transition-colors"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Start Your Journey
+              </motion.button>
+            </Link>
           </motion.div>
         </div>
       </section>

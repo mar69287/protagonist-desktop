@@ -1,101 +1,78 @@
 @import "tailwindcss";
 
 :root {
-  /* Dark Theme with Neon Accents - Inspired by Fireworks */
-  --background: #272727;
-  --foreground: #ffffff;
+  /* Protagonist - Minimalist Black & White with Glass Morphism */
+  --background: #000000; /* Pure black */
+  --foreground: #ffffff; /* Pure white */
 
-  /* Primary Colors - Neon Orange/Coral */
-  --primary-50: #fff5f0;
-  --primary-100: #ffe8dc;
-  --primary-200: #ffd1b9;
-  --primary-300: #ffba96;
-  --primary-400: #ff8d61;
-  --primary-500: #ff652f; /* Main primary - Neon Orange */
-  --primary-600: #ff4d0f;
-  --primary-700: #e63d00;
-  --primary-800: #cc3600;
-  --primary-900: #b32f00;
+  /* Base Colors */
+  --black: #000000;
+  --dark-gray: #1a1a1a;
+  --medium-gray: #2a2a2a;
+  --light-gray: #3a3a3a;
+  --border-gray: #404040;
+  --text-gray: #a0a0a0;
+  --white: #ffffff;
+  --off-white: #f5f5f5;
 
-  /* Accent Colors - Neon Mint Green */
-  --accent-50: #e6fdf5;
-  --accent-100: #ccfbeb;
-  --accent-200: #99f7d7;
-  --accent-300: #66f3c3;
-  --accent-400: #33efaf;
-  --accent-500: #14a76c; /* Main accent - Neon Green */
-  --accent-600: #109960;
-  --accent-700: #0d8b54;
-  --accent-800: #097d48;
-  --accent-900: #066f3c;
+  /* Glass Morphism Colors */
+  --glass-light: rgba(255, 255, 255, 0.1);
+  --glass-medium: rgba(255, 255, 255, 0.05);
+  --glass-dark: rgba(0, 0, 0, 0.3);
+  --glass-border: rgba(255, 255, 255, 0.2);
 
-  /* Success - Neon Mint Green */
-  --success-50: #e6fdf5;
-  --success-100: #ccfbeb;
-  --success-200: #99f7d7;
-  --success-300: #66f3c3;
-  --success-400: #33efaf;
-  --success-500: #14a76c;
-  --success-600: #109960;
-  --success-700: #0d8b54;
+  /* Accent Colors */
+  --accent: #ffffff;
+  --accent-dim: rgba(255, 255, 255, 0.7);
 
-  /* Warning - Neon Yellow */
-  --warning-50: #fffef0;
-  --warning-100: #fffcd6;
-  --warning-200: #fff9ad;
-  --warning-300: #fff684;
-  --warning-400: #fff35b;
-  --warning-500: #ffe400;
-  --warning-600: #d6be00;
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
 
-  /* Error - Bright Red */
-  --error-50: #fff0f0;
-  --error-100: #ffe0e0;
-  --error-200: #ffc1c1;
-  --error-300: #ffa2a2;
-  --error-400: #ff8383;
-  --error-500: #ff4d4d;
-  --error-600: #e63939;
-
-  /* Info - Bright Cyan */
-  --info-50: #e0f9ff;
-  --info-100: #b3f0ff;
-  --info-200: #80e7ff;
-  --info-300: #4ddeff;
-  --info-400: #1ad5ff;
-  --info-500: #00bcd4;
-  --info-600: #00a3b8;
-
-  /* Neutrals - Dark Theme */
-  --neutral-50: #f5f5f5;
-  --neutral-100: #e5e5e5;
-  --neutral-200: #cccccc;
-  --neutral-300: #b3b3b3;
-  --neutral-400: #999999;
-  --neutral-500: #747474; /* Medium gray */
-  --neutral-600: #5a5a5a;
-  --neutral-700: #404040;
-  --neutral-800: #2a2a2a;
-  --neutral-900: #1a1a1a;
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-round: 999px;
 }
 
 @theme {
-  /* Brand Colors - Semantic naming for easy theme changes */
-  --color-primary: #ff652f; /* Neon Orange - main brand color, primary CTAs */
-  --color-primary-hover: #ff4d0f; /* Darker orange - hover state */
-  --color-secondary: #14a76c; /* Neon Green - secondary actions, success states */
-  --color-secondary-hover: #109960; /* Darker green - hover state */
-  --color-accent: #ffe400; /* Neon Yellow - highlights, warnings, special emphasis */
+  /* Brand Colors - Black & White Minimalist */
+  --color-primary: #ffffff; /* White - main brand color, primary CTAs */
+  --color-primary-hover: rgba(255, 255, 255, 0.8); /* Dimmed white - hover state */
+  --color-secondary: #a0a0a0; /* Gray - secondary actions */
+  --color-secondary-hover: #ffffff; /* White - hover state */
+  --color-accent: #ffffff; /* White - highlights, special emphasis */
 
   /* Semantic Colors */
-  --color-success: #14a76c; /* Green - success messages */
-  --color-warning: #ffe400; /* Yellow - warning messages */
-  --color-error: #ff4d4d; /* Red - error messages, destructive actions */
-  --color-info: #00bcd4; /* Cyan - informational messages */
+  --color-success: #ffffff; /* White - success messages */
+  --color-warning: #a0a0a0; /* Gray - warning messages */
+  --color-error: #ffffff; /* White - error messages */
+  --color-info: #a0a0a0; /* Gray - informational messages */
 
   /* Background & Text */
-  --color-background: #272727; /* Dark charcoal - main page background */
-  --color-foreground: #ffffff; /* White - primary text color */
+  --color-background: #000000; /* Pure black - main page background */
+  --color-foreground: #ffffff; /* Pure white - primary text color */
+  --color-text-secondary: #a0a0a0; /* Gray - secondary text */
+
+  /* Glass Morphism */
+  --color-glass-light: rgba(255, 255, 255, 0.1);
+  --color-glass-medium: rgba(255, 255, 255, 0.05);
+  --color-glass-dark: rgba(0, 0, 0, 0.3);
+  --color-glass-border: rgba(255, 255, 255, 0.2);
+
+  /* Backgrounds */
+  --color-bg-dark-gray: #1a1a1a;
+  --color-bg-medium-gray: #2a2a2a;
+  --color-bg-light-gray: #3a3a3a;
+
+  /* Borders */
+  --color-border-gray: #404040;
 
   /* Fonts */
   --font-sans: var(--font-geist-sans);
@@ -106,4 +83,25 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glass Morphism Utilities */
+.glass-light {
+  background: var(--glass-light);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+}
+
+.glass-medium {
+  background: var(--glass-medium);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+}
+
+.glass-dark {
+  background: var(--glass-dark);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
 }

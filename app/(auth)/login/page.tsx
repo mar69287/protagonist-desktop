@@ -2,13 +2,11 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Mail, Lock, ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
 import Alert from "@/components/ui/Alert";
 
 export default function LoginPage() {
@@ -28,6 +26,7 @@ export default function LoginPage() {
       await login(email, password);
       router.push("/");
     } catch (err) {
+      console.error(err);
       setError("Invalid email or password");
     } finally {
       setLoading(false);
@@ -35,7 +34,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+    <div className="flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -48,17 +47,18 @@ export default function LoginPage() {
             className="inline-flex items-center gap-2 mb-4"
             whileHover={{ scale: 1.05 }}
           >
-            <Sparkles className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-bold text-white">Brand</h1>
+            <h1 className="text-3xl font-bold text-white">Protagonist</h1>
           </motion.div>
-          <p className="text-neutral-300">Welcome back! Please login to your account.</p>
+          <p className="text-[#a0a0a0]">
+            Welcome back! Please login to your account.
+          </p>
         </div>
 
-        <Card variant="elevated" padding="lg">
+        <div className="glass-light rounded-2xl p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <h2 className="text-2xl font-bold text-white mb-2">Login</h2>
-              <p className="text-neutral-400 text-sm">
+              <p className="text-[#a0a0a0] text-sm">
                 Enter your credentials to access your account
               </p>
             </div>
@@ -91,13 +91,13 @@ export default function LoginPage() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  className="w-4 h-4 rounded border-neutral-600 bg-neutral-700 text-primary focus:ring-primary"
+                  className="w-4 h-4 rounded border-[#404040] bg-[#1a1a1a] text-white focus:ring-white"
                 />
-                <span className="text-sm text-neutral-300">Remember me</span>
+                <span className="text-sm text-[#a0a0a0]">Remember me</span>
               </label>
               <Link
                 href="/forgot-password"
-                className="text-sm text-primary hover:text-primary-hover transition-colors"
+                className="text-sm text-white hover:text-[#f5f5f5] transition-colors"
               >
                 Forgot password?
               </Link>
@@ -113,45 +113,18 @@ export default function LoginPage() {
               {loading ? "Logging in..." : "Login"}
             </Button>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-neutral-700"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-neutral-800 text-neutral-400">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                className="flex items-center justify-center gap-2 px-4 py-2 border border-neutral-600 rounded-lg hover:bg-neutral-700 transition-colors"
-              >
-                <span className="text-neutral-200">Google</span>
-              </button>
-              <button
-                type="button"
-                className="flex items-center justify-center gap-2 px-4 py-2 border border-neutral-600 rounded-lg hover:bg-neutral-700 transition-colors"
-              >
-                <span className="text-neutral-200">GitHub</span>
-              </button>
-            </div>
-
-            <div className="text-center text-sm text-neutral-400">
+            <div className="text-center text-sm text-[#a0a0a0]">
               Don't have an account?{" "}
               <Link
-                href="/signup"
-                className="text-secondary hover:text-secondary-hover font-medium transition-colors"
+                href="/subscriptions/signup"
+                className="text-white hover:text-[#f5f5f5] font-medium transition-colors"
               >
                 Sign up
               </Link>
             </div>
           </form>
-        </Card>
+        </div>
       </motion.div>
     </div>
   );
 }
-

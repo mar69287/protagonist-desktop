@@ -1,156 +1,111 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Github, Twitter, Linkedin, Mail, Sparkles } from "lucide-react";
+import { Mail } from "lucide-react";
 import Link from "next/link";
-
-const footerLinks = {
-  product: [
-    { name: "Features", href: "/features" },
-    { name: "Pricing", href: "/pricing" },
-    { name: "Documentation", href: "/docs" },
-  ],
-  company: [
-    { name: "About", href: "/about" },
-    { name: "Blog", href: "/blog" },
-    { name: "Careers", href: "/careers" },
-  ],
-  legal: [
-    { name: "Privacy", href: "/privacy" },
-    { name: "Terms", href: "/terms" },
-    { name: "Cookies", href: "/cookies" },
-  ],
-};
-
-const socialLinks = [
-  { icon: Github, href: "https://github.com", label: "GitHub" },
-  { icon: Twitter, href: "https://twitter.com", label: "Twitter" },
-  { icon: Linkedin, href: "https://linkedin.com", label: "LinkedIn" },
-  { icon: Mail, href: "mailto:contact@example.com", label: "Email" },
-];
 
 export default function Footer() {
   return (
-    <footer className="relative bg-neutral-800 border-t border-neutral-700">
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <footer className="relative glass-medium border-t border-[#404040]">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Main footer content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
+        <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-8">
           {/* Brand section */}
           <motion.div
-            className="lg:col-span-2"
+            className="text-center md:text-left"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <Link href="/" className="flex items-center space-x-2 mb-4 group">
-              <motion.div
-                whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                transition={{ duration: 0.5 }}
-              >
-                <Sparkles className="w-8 h-8 text-primary" />
-              </motion.div>
-              <span className="text-2xl font-bold text-white">Brand</span>
+            <Link href="/" className="inline-block mb-3">
+              <span className="text-2xl font-bold text-white">Protagonist</span>
             </Link>
-            <p className="text-neutral-300 mb-6 max-w-md">
-              Building the future with innovative solutions. Creating unique
-              experiences that stand out from the crowd.
+            <p className="text-[#a0a0a0] max-w-xs mb-4">
+              Get paid to accomplish your goals. Transform aspirations into achievements.
             </p>
 
-            {/* Social links */}
-            <div className="flex space-x-4">
-              {socialLinks.map((social, index) => (
-                <motion.a
-                  key={social.label}
-                  href={social.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 rounded-full bg-neutral-700 border border-neutral-600 hover:border-primary hover:shadow-[0_0_15px_rgba(255,101,47,0.3)] transition-all group"
-                  whileHover={{ scale: 1.1, rotate: 5 }}
-                  whileTap={{ scale: 0.95 }}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.1 }}
-                  aria-label={social.label}
-                >
-                  <social.icon className="w-5 h-5 text-neutral-300 group-hover:text-primary transition-colors" />
-                </motion.a>
-              ))}
+            {/* Contact */}
+            <div className="flex items-center justify-center md:justify-start space-x-2">
+              <Mail className="w-4 h-4 text-[#a0a0a0]" />
+              <a
+                href="mailto:support@protagonist.app"
+                className="text-[#a0a0a0] hover:text-white transition-colors text-sm"
+              >
+                support@protagonist.app
+              </a>
             </div>
           </motion.div>
 
-          {/* Footer links columns */}
-          {Object.entries(footerLinks).map(([category, links], colIndex) => (
-            <motion.div
-              key={category}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: colIndex * 0.1 }}
-            >
-              <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
-                {category}
+          {/* Links section */}
+          <motion.div
+            className="flex flex-col md:flex-row gap-8 md:gap-16"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1, duration: 0.5 }}
+          >
+            <div className="text-center md:text-left">
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-3">
+                Product
               </h3>
-              <ul className="space-y-3">
-                {links.map((link, linkIndex) => (
-                  <motion.li
-                    key={link.name}
-                    initial={{ opacity: 0, x: -10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: colIndex * 0.1 + linkIndex * 0.05 }}
+              <ul className="space-y-2">
+                <li>
+                  <Link
+                    href="/"
+                    className="text-[#a0a0a0] hover:text-white transition-colors text-sm"
                   >
-                    <Link
-                      href={link.href}
-                      className="text-neutral-300 hover:text-secondary transition-colors inline-block group"
-                    >
-                      <span className="relative">
-                        {link.name}
-                        <motion.span
-                          className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600 rounded-full"
-                          initial={{ scaleX: 0 }}
-                          whileHover={{ scaleX: 1 }}
-                          transition={{ duration: 0.3 }}
-                          style={{ originX: 0 }}
-                        />
-                      </span>
-                    </Link>
-                  </motion.li>
-                ))}
+                    Home
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/subscriptions/signup"
+                    className="text-[#a0a0a0] hover:text-white transition-colors text-sm"
+                  >
+                    Pricing
+                  </Link>
+                </li>
               </ul>
-            </motion.div>
-          ))}
+            </div>
+
+            <div className="text-center md:text-left">
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-3">
+                Legal
+              </h3>
+              <ul className="space-y-2">
+                <li>
+                  <Link
+                    href="/privacy"
+                    className="text-[#a0a0a0] hover:text-white transition-colors text-sm"
+                  >
+                    Privacy
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/terms"
+                    className="text-[#a0a0a0] hover:text-white transition-colors text-sm"
+                  >
+                    Terms
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </motion.div>
         </div>
 
         {/* Bottom bar */}
         <motion.div
-          className="pt-8 border-t border-neutral-700 flex flex-col sm:flex-row justify-between items-center"
+          className="pt-8 mt-8 border-t border-[#404040] text-center"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.2 }}
         >
-          <p className="text-neutral-400 text-sm mb-4 sm:mb-0 flex items-center">
-            © {new Date().getFullYear()} Brand. All rights reserved.
+          <p className="text-[#a0a0a0] text-sm">
+            © {new Date().getFullYear()} Protagonist. All rights reserved.
           </p>
-
-          <div className="flex items-center space-x-6">
-            <motion.a
-              href="/privacy"
-              className="text-sm text-neutral-400 hover:text-accent transition-colors"
-              whileHover={{ scale: 1.05 }}
-            >
-              Privacy Policy
-            </motion.a>
-            <motion.a
-              href="/terms"
-              className="text-sm text-neutral-400 hover:text-accent transition-colors"
-              whileHover={{ scale: 1.05 }}
-            >
-              Terms of Service
-            </motion.a>
-          </div>
         </motion.div>
       </div>
     </footer>
