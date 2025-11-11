@@ -18,4 +18,5 @@ export const dynamoDbClient = client;
 // DynamoDB table names
 export const TableNames = {
   USERS: "users",
+  PAYMENT_HISTORY: "paymentHistory",
 } as const;

@@ -72,17 +72,17 @@ export default function ReturnPage() {
               Your First Month - How You Earn It Back:
             </h2>
             <ul className="space-y-2 sm:space-y-3 text-[#a0a0a0]">
-              <li className="flex justify-between text-xs sm:text-sm">
+              {/* <li className="flex justify-between text-xs sm:text-sm">
                 <span>0-50% goal completion:</span>
+                <span className="text-white ml-2">$0 back</span>
+              </li> */}
+              <li className="flex justify-between text-xs sm:text-sm">
+                <span>0-70% goal completion:</span>
                 <span className="text-white ml-2">$0 back</span>
               </li>
               <li className="flex justify-between text-xs sm:text-sm">
-                <span>50-70% goal completion:</span>
-                <span className="text-white ml-2">$22 back</span>
-              </li>
-              <li className="flex justify-between text-xs sm:text-sm">
                 <span>70-90% goal completion:</span>
-                <span className="text-white ml-2">$49 back</span>
+                <span className="text-white ml-2">$50 back</span>
               </li>
               <li className="flex justify-between text-xs sm:text-sm">
                 <span>90%+ goal completion:</span>

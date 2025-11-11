@@ -13,7 +13,12 @@ const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 );
 
-export default function CheckoutForm() {
+interface CheckoutFormProps {
+  userId: string;
+  email?: string;
+}
+
+export default function CheckoutForm({ userId, email }: CheckoutFormProps) {
   const fetchClientSecret = useCallback(async () => {
     // Call your API to create a checkout session
     // Now using Stripe Price ID from product catalog
@@ -22,11 +27,12 @@ export default function CheckoutForm() {
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ userId, email }),
     });
 
     const data = await response.json();
     return data.clientSecret;
-  }, []);
+  }, [userId, email]);
 
   const options = {
     fetchClientSecret,

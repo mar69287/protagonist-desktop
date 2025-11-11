@@ -434,7 +434,7 @@ function SignupContent() {
 
               {/* White container for Stripe checkout */}
               <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-8 md:p-12 shadow-2xl">
-                <CheckoutForm />
+                {userId && <CheckoutForm userId={userId} email={user?.email} />}
               </div>
 
               <button

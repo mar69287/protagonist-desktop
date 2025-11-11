@@ -5,11 +5,20 @@ import Stripe from "stripe";
 // Make sure to add STRIPE_SECRET_KEY to your .env.local
 // STRIPE_SECRET_KEY=sk_test_...
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-11-20.acacia",
+  apiVersion: "2025-10-29.clover",
 });
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId, email } = await request.json();
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "User ID is required" },
+        { status: 400 }
+      );
+    }
+
     // Get the price ID from environment variables
     const priceId = process.env.STRIPE_PRICE_ID;
 
@@ -27,11 +36,18 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: "subscription", // Changed from "payment" to "subscription"
+      customer_email: email, // Pre-fill email in checkout
       return_url: `${request.headers.get(
         "origin"
       )}/subscriptions/return?session_id={CHECKOUT_SESSION_ID}`,
+      subscription_data: {
+        metadata: {
+          user_id: userId, // This will be available in all webhook events
+        },
+      },
       metadata: {
         plan_type: "goal_commitment",
+        user_id: userId,
       },
     });
 
