@@ -19,4 +19,6 @@ export const dynamoDbClient = client;
 export const TableNames = {
   USERS: "users",
   PAYMENT_HISTORY: "paymentHistory",
+  ONBOARDING_CHAT: "onboarding-chat",
+  CHALLENGES: "challenges",
 } as const;

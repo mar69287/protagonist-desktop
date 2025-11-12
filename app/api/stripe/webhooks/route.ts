@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { dynamoDb, TableNames } from "@/services/aws/dynamodb";
 import { UpdateCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { v4 as uuidv4 } from "uuid";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-10-29.clover",
@@ -107,7 +108,6 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   }
 
   try {
-    // Access period dates from subscription items (they're not at top level)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const subscriptionItem = (subscription as any).items?.data?.[0];
     const currentPeriodStart = subscriptionItem?.current_period_start;
@@ -148,6 +148,115 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     );
 
     console.log(`User ${userId} subscription created successfully`);
+
+    const { GetCommand, QueryCommand } = await import("@aws-sdk/lib-dynamodb");
+
+    const paymentHistory = await dynamoDb.send(
+      new QueryCommand({
+        TableName: TableNames.PAYMENT_HISTORY,
+        IndexName: "userId-createdAt-index",
+        KeyConditionExpression: "userId = :userId",
+        ExpressionAttributeValues: {
+          ":userId": userId,
+        },
+        Limit: 1,
+      })
+    );
+
+    const isFirstSubscription =
+      !paymentHistory.Items || paymentHistory.Items.length === 0;
+
+    if (isFirstSubscription) {
+      console.log(`First subscription for user ${userId} - creating Challenge`);
+
+      // Fetch onboarding data
+      const onboardingData = await dynamoDb.send(
+        new GetCommand({
+          TableName: TableNames.ONBOARDING_CHAT,
+          Key: { userId: userId },
+        })
+      );
+
+      if (!onboardingData.Item) {
+        console.error(`No onboarding data found for user ${userId}`);
+        return;
+      }
+
+      const onboarding = onboardingData.Item;
+      const structuredSchedule = onboarding.structuredSchedule || {};
+
+      // Generate challengeId
+      const challengeId = uuidv4();
+
+      // Create Challenge record
+      await dynamoDb.send(
+        new PutCommand({
+          TableName: TableNames.CHALLENGES,
+          Item: {
+            challengeId: challengeId,
+            userId: userId,
+            subscriptionId: subscription.id,
+            status: "active",
+
+            // From onboarding
+            goal: onboarding.goal,
+            plan: onboarding.plan,
+            schedule: onboarding.schedule, // Human-readable
+            proofMethod: onboarding.proofMethod,
+            timezone: onboarding.timezone,
+
+            // Structured schedule for logic
+            scheduleDays: structuredSchedule.days || [],
+            deadlineTime: structuredSchedule.deadline_time || "23:59",
+            frequency: structuredSchedule.frequency || "weekly",
+
+            // Tracking
+            totalSubmissions: 0,
+            successfulSubmissions: 0,
+            currentCompletionRate: 0,
+
+            // Billing period
+            startDate: currentPeriodStart
+              ? new Date(currentPeriodStart * 1000).toISOString()
+              : new Date().toISOString(),
+            endDate: currentPeriodEnd
+              ? new Date(currentPeriodEnd * 1000).toISOString()
+              : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            nextBillingDate: currentPeriodEnd
+              ? new Date(currentPeriodEnd * 1000).toISOString()
+              : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+
+            // Timestamps
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        })
+      );
+
+      console.log(`Challenge ${challengeId} created for user ${userId}`);
+
+      // Update user with challengeId
+      await dynamoDb.send(
+        new UpdateCommand({
+          TableName: TableNames.USERS,
+          Key: { userId: userId },
+          UpdateExpression: "SET currentChallengeId = :challengeId",
+          ExpressionAttributeValues: {
+            ":challengeId": challengeId,
+          },
+        })
+      );
+
+      console.log(`User ${userId} updated with challengeId ${challengeId}`);
+
+      // TODO: Create EventBridge rule for checking before billing
+      // const oneHourBeforeBilling = new Date(currentPeriodEnd * 1000 - 3600000);
+      // await createEventBridgeRule(challengeId, oneHourBeforeBilling);
+    } else {
+      console.log(
+        `User ${userId} has existing payment history - skipping Challenge creation`
+      );
+    }
   } catch (error) {
     console.error("Error updating user with subscription:", error);
     throw error;
