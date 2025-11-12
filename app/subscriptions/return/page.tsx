@@ -67,7 +67,7 @@ export default function ReturnPage() {
             {customerEmail}
           </p>
 
-          <div className="glass-medium rounded-lg sm:rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 text-left">
+          <div className="glass-medium rounded-lg sm:rounded-xl p-4 sm:p-6 sm:mb-8 text-left">
             <h2 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">
               Your First Month - How You Earn It Back:
             </h2>
@@ -104,12 +104,12 @@ export default function ReturnPage() {
             </div>
           </div>
 
-          <Link
+          {/* <Link
             href="/"
             className="inline-block bg-white text-black px-6 sm:px-8 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-semibold hover:bg-[#f5f5f5] transition-colors"
           >
             Go to Dashboard
-          </Link>
+          </Link> */}
         </motion.div>
       </div>
     );
