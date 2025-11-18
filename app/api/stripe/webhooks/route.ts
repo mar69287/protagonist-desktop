@@ -203,6 +203,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
             plan: onboarding.plan,
             schedule: onboarding.schedule, // Human-readable
             proofMethod: onboarding.proofMethod,
+            submissionType: onboarding.submissionType,
             timezone: onboarding.timezone,
 
             // Structured schedule for logic
