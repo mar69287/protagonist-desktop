@@ -142,11 +142,6 @@ export async function POST(request: NextRequest) {
       const submissionCalendar: SubmissionDay[] =
         challenge.submissionCalendar || [];
 
-      // Get current billing period identifier (year-month)
-      const currentPeriodId = `${checkTime.getUTCFullYear()}-${String(
-        checkTime.getUTCMonth() + 1
-      ).padStart(2, "0")}`;
-
       // Filter to submissions in billing period with proper criteria:
       // 1. Submission date is within billing period
       // 2. Deadline has PASSED (don't evaluate future submissions)
@@ -165,12 +160,15 @@ export async function POST(request: NextRequest) {
         const deadlinePassed = deadline <= now;
 
         // Status must be final (verified = passed AI check, denied = failed AI check but they tried)
-        const isFinalStatus = day.status === "verified" || day.status === "denied";
+        const isFinalStatus =
+          day.status === "verified" || day.status === "denied";
 
         // Not already checked in a previous period
         const notAlreadyChecked = !day.refundCheckPeriod;
 
-        return inDateRange && deadlinePassed && isFinalStatus && notAlreadyChecked;
+        return (
+          inDateRange && deadlinePassed && isFinalStatus && notAlreadyChecked
+        );
       });
 
       allRelevantSubmissions.push(...submissionsInPeriod);
@@ -263,22 +261,25 @@ export async function POST(request: NextRequest) {
     // Update each challenge's submissionCalendar to mark checked submissions
     const { UpdateCommand } = await import("@aws-sdk/lib-dynamodb");
     for (const challenge of challengesToCheck) {
-      const updatedCalendar = (challenge.submissionCalendar || []).map((day) => {
-        // If this submission was included in our check, mark it
-        const wasIncluded = allRelevantSubmissions.some(
-          (sub) => sub.targetDate === day.targetDate
-        );
-        if (wasIncluded) {
-          return { ...day, refundCheckPeriod: currentPeriodId };
+      const updatedCalendar = (challenge.submissionCalendar || []).map(
+        (day: SubmissionDay) => {
+          // If this submission was included in our check, mark it
+          const wasIncluded = allRelevantSubmissions.some(
+            (sub) => sub.targetDate === day.targetDate
+          );
+          if (wasIncluded) {
+            return { ...day, refundCheckPeriod: currentPeriodId };
+          }
+          return day;
         }
-        return day;
-      });
+      );
 
       await dynamoDb.send(
         new UpdateCommand({
           TableName: TableNames.CHALLENGES,
           Key: { challengeId: challenge.challengeId },
-          UpdateExpression: "SET submissionCalendar = :calendar, updatedAt = :updatedAt",
+          UpdateExpression:
+            "SET submissionCalendar = :calendar, updatedAt = :updatedAt",
           ExpressionAttributeValues: {
             ":calendar": updatedCalendar,
             ":updatedAt": new Date().toISOString(),
@@ -296,6 +297,8 @@ export async function POST(request: NextRequest) {
       await processRefund(userId, subscriptionId, refundCalculation);
     } else {
       console.log(`No refund needed for user ${userId}`);
+      // Create a payment history record for the "no refund" decision
+      await recordNoRefund(userId, subscriptionId, refundCalculation);
     }
 
     // Delete the EventBridge rule since it's a one-time trigger
@@ -580,5 +583,87 @@ async function processRefund(
   } catch (error) {
     console.error("Error processing refund:", error);
     throw error;
+  }
+}
+
+/**
+ * Record a "no refund" decision in payment history for audit trail
+ */
+async function recordNoRefund(
+  userId: string,
+  subscriptionId: string,
+  refundCalculation: {
+    refundAmount: number;
+    successfulSubmissions: number;
+    totalExpected: number;
+    completionRate: number;
+  }
+): Promise<void> {
+  try {
+    // Get the most recent payment for this subscription to link to it
+    const { QueryCommand } = await import("@aws-sdk/lib-dynamodb");
+
+    const paymentResult = await dynamoDb.send(
+      new QueryCommand({
+        TableName: TableNames.PAYMENT_HISTORY,
+        IndexName: "userId-createdAt-index",
+        KeyConditionExpression: "userId = :userId",
+        FilterExpression:
+          "subscriptionId = :subscriptionId AND #type = :paymentType AND #status = :succeededStatus",
+        ExpressionAttributeNames: {
+          "#type": "type",
+          "#status": "status",
+        },
+        ExpressionAttributeValues: {
+          ":userId": userId,
+          ":subscriptionId": subscriptionId,
+          ":paymentType": "payment",
+          ":succeededStatus": "succeeded",
+        },
+        ScanIndexForward: false, // Sort descending by createdAt
+        Limit: 1,
+      })
+    );
+
+    const payment = paymentResult.Items?.[0];
+    const timestamp = new Date().toISOString();
+
+    // Create a unique ID for this no-refund record
+    const noRefundRecordId = `no-refund-${userId}-${subscriptionId}-${timestamp}`;
+
+    // Record the no-refund decision in payment history
+    await dynamoDb.send(
+      new PutCommand({
+        TableName: TableNames.PAYMENT_HISTORY,
+        Item: {
+          paymentId: noRefundRecordId,
+          userId,
+          subscriptionId,
+          type: "refund",
+          amount: 0,
+          status: "not_eligible",
+          stripeInvoiceId: payment?.stripeInvoiceId || null,
+          stripePaymentIntentId: payment?.stripePaymentIntentId || null,
+          stripeChargeId: null,
+          refundReason: `No refund: ${
+            refundCalculation.successfulSubmissions
+          }/${
+            refundCalculation.totalExpected
+          } submissions completed (${refundCalculation.completionRate.toFixed(
+            2
+          )}% - threshold not met)`,
+          createdAt: timestamp,
+        },
+      })
+    );
+
+    console.log(
+      `No-refund decision recorded in payment history for user ${userId}: ${refundCalculation.completionRate.toFixed(
+        2
+      )}% completion`
+    );
+  } catch (error) {
+    console.error("Error recording no-refund decision:", error);
+    // Don't throw - we don't want to fail the entire check if recording fails
   }
 }
