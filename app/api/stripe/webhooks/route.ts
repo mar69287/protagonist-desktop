@@ -3,6 +3,11 @@ import Stripe from "stripe";
 import { dynamoDb, TableNames } from "@/services/aws/dynamodb";
 import { UpdateCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
+import {
+  generateSubmissionCalendar,
+  SubmissionDay,
+} from "@/lib/generateSubmissionCalendar";
+import { createPreBillingCheckRule } from "@/services/aws/eventbridge";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-10-29.clover",
@@ -71,6 +76,11 @@ export async function POST(request: NextRequest) {
         await handleChargeRefunded(event.data.object);
         break;
 
+      case "payment_intent.created":
+        // Handle PaymentIntent creation - link to invoice for refunds
+        await handlePaymentIntentCreated(event.data.object);
+        break;
+
       case "payment_intent.succeeded":
         await handlePaymentIntentSucceeded(event.data.object);
         break;
@@ -108,12 +118,65 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   }
 
   try {
+    // Fetch the full subscription from Stripe API to ensure we have complete data
+    // The webhook event sometimes has incomplete data
+    const fullSubscription = await stripe.subscriptions.retrieve(
+      subscription.id
+    );
+    console.log({ fullSubscription });
+    console.log({ subscription });
+
+    // Access period dates from the subscription object
+    // Using type assertion as these properties exist but aren't in the type definition
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const subscriptionItem = (subscription as any).items?.data?.[0];
-    const currentPeriodStart = subscriptionItem?.current_period_start;
-    const currentPeriodEnd = subscriptionItem?.current_period_end;
+    let currentPeriodStart = (fullSubscription as any).current_period_start;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end;
+    let currentPeriodEnd = (fullSubscription as any).current_period_end;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cancelAtPeriodEnd = (fullSubscription as any).cancel_at_period_end;
+
+    // Fallback: If current_period_start/end don't exist (flexible billing mode),
+    // use billing_cycle_anchor and calculate the end date
+    if (!currentPeriodStart || !currentPeriodEnd) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const billingCycleAnchor = (fullSubscription as any).billing_cycle_anchor;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const interval = (fullSubscription as any).plan?.interval || "month";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const intervalCount = (fullSubscription as any).plan?.interval_count || 1;
+
+      if (billingCycleAnchor) {
+        // Calculate the next billing date from the anchor using UTC methods
+        const anchorDate = new Date(billingCycleAnchor * 1000);
+        const nextBillingDate = new Date(anchorDate);
+
+        if (interval === "month") {
+          // setUTCMonth handles different month lengths automatically
+          nextBillingDate.setUTCMonth(
+            nextBillingDate.getUTCMonth() + intervalCount
+          );
+        } else if (interval === "year") {
+          nextBillingDate.setUTCFullYear(
+            nextBillingDate.getUTCFullYear() + intervalCount
+          );
+        } else if (interval === "week") {
+          nextBillingDate.setUTCDate(
+            nextBillingDate.getUTCDate() + 7 * intervalCount
+          );
+        } else if (interval === "day") {
+          nextBillingDate.setUTCDate(
+            nextBillingDate.getUTCDate() + intervalCount
+          );
+        }
+
+        currentPeriodStart = billingCycleAnchor;
+        currentPeriodEnd = Math.floor(nextBillingDate.getTime() / 1000);
+      }
+    }
+
+    console.log(
+      `Subscription period data: start=${currentPeriodStart}, end=${currentPeriodEnd}`
+    );
 
     await dynamoDb.send(
       new UpdateCommand({
@@ -130,11 +193,11 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
         `,
         ExpressionAttributeValues: {
           ":customerId":
-            typeof subscription.customer === "string"
-              ? subscription.customer
-              : subscription.customer?.id || null,
-          ":subscriptionId": subscription.id,
-          ":status": subscription.status,
+            typeof fullSubscription.customer === "string"
+              ? fullSubscription.customer
+              : fullSubscription.customer?.id || null,
+          ":subscriptionId": fullSubscription.id,
+          ":status": fullSubscription.status,
           ":periodStart": currentPeriodStart
             ? new Date(currentPeriodStart * 1000).toISOString()
             : new Date().toISOString(),
@@ -188,6 +251,39 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       // Generate challengeId
       const challengeId = uuidv4();
 
+      // Calculate start and end dates
+      const startDate = currentPeriodStart
+        ? new Date(currentPeriodStart * 1000).toISOString()
+        : new Date().toISOString();
+
+      const endDate = currentPeriodEnd
+        ? new Date(currentPeriodEnd * 1000).toISOString()
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      // Generate submission calendar
+      const scheduleDays = structuredSchedule.days || [];
+      const deadlineTime = structuredSchedule.deadline_time || "23:59";
+      const timezone = onboarding.timezone || "America/Los_Angeles";
+
+      let submissionCalendar: SubmissionDay[] = [];
+
+      if (scheduleDays.length > 0) {
+        try {
+          submissionCalendar = generateSubmissionCalendar(
+            startDate,
+            endDate,
+            scheduleDays,
+            deadlineTime,
+            timezone
+          );
+          console.log(
+            `Generated ${submissionCalendar.length} submission days for challenge ${challengeId}`
+          );
+        } catch (error) {
+          console.error(`Error generating submission calendar: ${error}`);
+        }
+      }
+
       // Create Challenge record
       await dynamoDb.send(
         new PutCommand({
@@ -195,7 +291,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
           Item: {
             challengeId: challengeId,
             userId: userId,
-            subscriptionId: subscription.id,
+            subscriptionId: fullSubscription.id,
             status: "active",
 
             // From onboarding
@@ -211,21 +307,18 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
             deadlineTime: structuredSchedule.deadline_time || "23:59",
             frequency: structuredSchedule.frequency || "weekly",
 
+            // Submission calendar - NEW!
+            submissionCalendar: submissionCalendar,
+
             // Tracking
             totalSubmissions: 0,
             successfulSubmissions: 0,
             currentCompletionRate: 0,
 
             // Billing period
-            startDate: currentPeriodStart
-              ? new Date(currentPeriodStart * 1000).toISOString()
-              : new Date().toISOString(),
-            endDate: currentPeriodEnd
-              ? new Date(currentPeriodEnd * 1000).toISOString()
-              : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            nextBillingDate: currentPeriodEnd
-              ? new Date(currentPeriodEnd * 1000).toISOString()
-              : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            startDate: startDate,
+            endDate: endDate,
+            nextBillingDate: endDate,
 
             // Timestamps
             createdAt: new Date().toISOString(),
@@ -250,9 +343,41 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
 
       console.log(`User ${userId} updated with challengeId ${challengeId}`);
 
-      // TODO: Create EventBridge rule for checking before billing
-      // const oneHourBeforeBilling = new Date(currentPeriodEnd * 1000 - 3600000);
-      // await createEventBridgeRule(challengeId, oneHourBeforeBilling);
+      // Create EventBridge rule for checking before billing
+      // Schedule check 1 hour before billing period ends
+      if (currentPeriodEnd && !isNaN(currentPeriodEnd)) {
+        const oneHourBeforeBilling = new Date(
+          currentPeriodEnd * 1000 - 3600000
+        );
+
+        // Validate the date is valid
+        if (!isNaN(oneHourBeforeBilling.getTime())) {
+          try {
+            await createPreBillingCheckRule(
+              userId,
+              fullSubscription.id,
+              oneHourBeforeBilling
+            );
+            console.log(
+              `EventBridge rule created for user ${userId} at ${oneHourBeforeBilling.toISOString()}`
+            );
+          } catch (error) {
+            console.error(
+              `Failed to create EventBridge rule for user ${userId}:`,
+              error
+            );
+            // Don't throw - we still want the subscription to succeed
+          }
+        } else {
+          console.error(
+            `Invalid date calculated for EventBridge rule: ${oneHourBeforeBilling}`
+          );
+        }
+      } else {
+        console.error(
+          `Invalid currentPeriodEnd from Stripe: ${currentPeriodEnd}`
+        );
+      }
     } else {
       console.log(
         `User ${userId} has existing payment history - skipping Challenge creation`
@@ -274,11 +399,12 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 
   try {
-    // Access period dates from subscription items (they're not at top level)
+    // Access period dates from the subscription object directly
+    // Using type assertion as these properties exist but aren't in the type definition
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const subscriptionItem = (subscription as any).items?.data?.[0];
-    const currentPeriodStart = subscriptionItem?.current_period_start;
-    const currentPeriodEnd = subscriptionItem?.current_period_end;
+    const currentPeriodStart = (subscription as any).current_period_start;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const currentPeriodEnd = (subscription as any).current_period_end;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end;
 
@@ -376,11 +502,12 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       throw new Error("No user_id in subscription metadata");
     }
 
-    // Access period dates from subscription items (they're not at top level)
+    // Access period dates from the subscription object directly
+    // Using type assertion as these properties exist but aren't in the type definition
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const subscriptionItem = (subscription as any).items?.data?.[0];
-    const currentPeriodStart = subscriptionItem?.current_period_start;
-    const currentPeriodEnd = subscriptionItem?.current_period_end;
+    const currentPeriodStart = (subscription as any).current_period_start;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const currentPeriodEnd = (subscription as any).current_period_end;
 
     // Update user with subscription period dates
     await dynamoDb.send(
@@ -404,8 +531,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       })
     );
 
-    // Note: In newer Stripe API (2025-10-29), charge IDs are not directly available on subscription invoices
-    // We'll use the invoice ID as the primary identifier, which is sufficient for tracking
+    // Store payment record - PaymentIntent will be retrieved from Stripe when needed for refunds
     await dynamoDb.send(
       new PutCommand({
         TableName: TableNames.PAYMENT_HISTORY,
@@ -417,7 +543,8 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
           amount: (invoice.amount_paid ?? 0) / 100, // Convert cents to dollars
           status: "succeeded",
           stripeInvoiceId: invoice.id,
-          stripeChargeId: null, // Not available in newer API for subscription invoices
+          stripeChargeId: null, // Not available in newer API
+          stripePaymentIntentId: null, // Will be retrieved from Stripe when needed
           createdAt: new Date().toISOString(),
         },
       })
@@ -579,12 +706,112 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   }
 }
 
+async function handlePaymentIntentCreated(paymentIntent: Stripe.PaymentIntent) {
+  console.log(`Payment intent created: ${paymentIntent.id}`);
+
+  try {
+    // Get the invoice ID from the PaymentIntent
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const piWithInvoice = paymentIntent as any;
+    const invoiceId =
+      typeof piWithInvoice.invoice === "string"
+        ? piWithInvoice.invoice
+        : piWithInvoice.invoice?.id;
+
+    if (!invoiceId) {
+      console.log(
+        "No invoice associated with PaymentIntent yet, will update when invoice is created"
+      );
+      return;
+    }
+
+    console.log(
+      `Updating payment record ${invoiceId} with PaymentIntent ${paymentIntent.id}`
+    );
+
+    // Update the payment record with the PaymentIntent ID
+    await dynamoDb.send(
+      new UpdateCommand({
+        TableName: TableNames.PAYMENT_HISTORY,
+        Key: { paymentId: invoiceId },
+        UpdateExpression: `SET stripePaymentIntentId = :paymentIntentId`,
+        ExpressionAttributeValues: {
+          ":paymentIntentId": paymentIntent.id,
+        },
+        // Only update if the record exists
+        ConditionExpression: "attribute_exists(paymentId)",
+      })
+    );
+
+    console.log(
+      `✅ PaymentIntent ${paymentIntent.id} linked to payment ${invoiceId}`
+    );
+  } catch (error) {
+    // If the record doesn't exist yet, that's okay - it will be created by invoice.payment_succeeded
+    if (
+      (error as { name?: string }).name === "ConditionalCheckFailedException"
+    ) {
+      console.log(
+        `Payment record doesn't exist yet for PaymentIntent ${paymentIntent.id}, will be created by invoice.payment_succeeded`
+      );
+    } else {
+      console.error("Error updating payment with PaymentIntent ID:", error);
+    }
+  }
+}
+
 async function handlePaymentIntentSucceeded(
   paymentIntent: Stripe.PaymentIntent
 ) {
   console.log(`Payment intent succeeded: ${paymentIntent.id}`);
-  // This is usually handled by invoice.payment_succeeded
-  // Add additional logic here if needed
+
+  try {
+    // Get the invoice ID from the PaymentIntent
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const piWithInvoice = paymentIntent as any;
+    const invoiceId =
+      typeof piWithInvoice.invoice === "string"
+        ? piWithInvoice.invoice
+        : piWithInvoice.invoice?.id;
+
+    if (!invoiceId) {
+      console.log("No invoice associated with PaymentIntent, skipping update");
+      return;
+    }
+
+    console.log(
+      `Updating payment record ${invoiceId} with PaymentIntent ${paymentIntent.id}`
+    );
+
+    // Update the payment record with the PaymentIntent ID
+    await dynamoDb.send(
+      new UpdateCommand({
+        TableName: TableNames.PAYMENT_HISTORY,
+        Key: { paymentId: invoiceId },
+        UpdateExpression: `SET stripePaymentIntentId = :paymentIntentId`,
+        ExpressionAttributeValues: {
+          ":paymentIntentId": paymentIntent.id,
+        },
+        // Only update if the record exists
+        ConditionExpression: "attribute_exists(paymentId)",
+      })
+    );
+
+    console.log(
+      `✅ PaymentIntent ${paymentIntent.id} linked to payment ${invoiceId}`
+    );
+  } catch (error) {
+    // If the record doesn't exist yet, that's okay - it will be created by invoice.payment_succeeded
+    if (
+      (error as { name?: string }).name === "ConditionalCheckFailedException"
+    ) {
+      console.log(
+        `Payment record doesn't exist yet for PaymentIntent ${paymentIntent.id}, will be created by invoice.payment_succeeded`
+      );
+    } else {
+      console.error("Error updating payment with PaymentIntent ID:", error);
+    }
+  }
 }
 
 async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {

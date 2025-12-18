@@ -27,6 +27,7 @@ export interface PaymentHistory {
   status: "succeeded" | "failed" | "refunded";
   stripeInvoiceId?: string | null;
   stripeChargeId?: string | null;
+  stripePaymentIntentId?: string | null;
   refundReason?: string | null;
   createdAt: string;
 }
