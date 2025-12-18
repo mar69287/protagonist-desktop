@@ -502,12 +502,135 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       throw new Error("No user_id in subscription metadata");
     }
 
-    // Access period dates from the subscription object directly
-    // Using type assertion as these properties exist but aren't in the type definition
+    // Get period dates from invoice (more reliable than subscription for flexible billing)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const currentPeriodStart = (subscription as any).current_period_start;
+    const invoicePeriodStart = (invoice as any).period_start;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const currentPeriodEnd = (subscription as any).current_period_end;
+    const invoicePeriodEnd = (invoice as any).period_end;
+
+    console.log(`📄 Invoice details for ${invoice.id}:`);
+    console.log(
+      `  period_start: ${invoicePeriodStart} (${new Date(
+        invoicePeriodStart * 1000
+      ).toISOString()})`
+    );
+    console.log(
+      `  period_end: ${invoicePeriodEnd} (${new Date(
+        invoicePeriodEnd * 1000
+      ).toISOString()})`
+    );
+    console.log(`  billing_reason: ${invoice.billing_reason}`);
+    console.log(
+      `  created: ${invoice.created} (${new Date(
+        invoice.created * 1000
+      ).toISOString()})`
+    );
+
+    // Determine the ACTUAL current period dates based on billing reason
+    let actualPeriodStart = invoicePeriodStart;
+    let actualPeriodEnd = invoicePeriodEnd;
+
+    const billingReason = invoice.billing_reason;
+
+    // For initial subscription creation, calculate the proper period end
+    if (billingReason === "subscription_create") {
+      console.log(
+        `🆕 Initial subscription - calculating period from billing cycle anchor`
+      );
+
+      // Get subscription details for period calculation
+      const fullSubscription = await stripe.subscriptions.retrieve(
+        subscriptionId
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const billingCycleAnchor = (fullSubscription as any).billing_cycle_anchor;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const interval = (fullSubscription as any).plan?.interval || "month";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const intervalCount = (fullSubscription as any).plan?.interval_count || 1;
+
+      if (billingCycleAnchor) {
+        const anchorDate = new Date(billingCycleAnchor * 1000);
+        const nextBillingDate = new Date(anchorDate);
+
+        if (interval === "month") {
+          nextBillingDate.setUTCMonth(
+            nextBillingDate.getUTCMonth() + intervalCount
+          );
+        } else if (interval === "year") {
+          nextBillingDate.setUTCFullYear(
+            nextBillingDate.getUTCFullYear() + intervalCount
+          );
+        } else if (interval === "week") {
+          nextBillingDate.setUTCDate(
+            nextBillingDate.getUTCDate() + 7 * intervalCount
+          );
+        } else if (interval === "day") {
+          nextBillingDate.setUTCDate(
+            nextBillingDate.getUTCDate() + intervalCount
+          );
+        }
+
+        actualPeriodStart = Math.floor(anchorDate.getTime() / 1000);
+        actualPeriodEnd = Math.floor(nextBillingDate.getTime() / 1000);
+
+        console.log(
+          `  Calculated period: ${new Date(
+            actualPeriodStart * 1000
+          ).toISOString()} to ${new Date(actualPeriodEnd * 1000).toISOString()}`
+        );
+      }
+    }
+    // For renewals, the invoice represents the period that JUST ENDED
+    // We need to calculate the NEW current period
+    else if (
+      billingReason === "subscription_cycle" ||
+      billingReason === "subscription_update"
+    ) {
+      console.log(
+        `🔄 Renewal detected - calculating NEW current period (invoice shows OLD period)`
+      );
+
+      // Get subscription details for interval calculation
+      const fullSubscription = await stripe.subscriptions.retrieve(
+        subscriptionId
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const interval = (fullSubscription as any).plan?.interval || "month";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const intervalCount = (fullSubscription as any).plan?.interval_count || 1;
+
+      // Current period START = invoice period END (the old period just ended)
+      actualPeriodStart = invoicePeriodEnd;
+
+      // Current period END = add one interval to period start
+      const periodStartDate = new Date(actualPeriodStart * 1000);
+      const periodEndDate = new Date(periodStartDate);
+
+      if (interval === "month") {
+        periodEndDate.setUTCMonth(periodEndDate.getUTCMonth() + intervalCount);
+      } else if (interval === "year") {
+        periodEndDate.setUTCFullYear(
+          periodEndDate.getUTCFullYear() + intervalCount
+        );
+      } else if (interval === "week") {
+        periodEndDate.setUTCDate(
+          periodEndDate.getUTCDate() + 7 * intervalCount
+        );
+      } else if (interval === "day") {
+        periodEndDate.setUTCDate(periodEndDate.getUTCDate() + intervalCount);
+      }
+
+      actualPeriodEnd = Math.floor(periodEndDate.getTime() / 1000);
+
+      console.log(
+        `  NEW current period: ${new Date(
+          actualPeriodStart * 1000
+        ).toISOString()} to ${new Date(actualPeriodEnd * 1000).toISOString()}`
+      );
+    }
 
     // Update user with subscription period dates
     await dynamoDb.send(
@@ -520,15 +643,25 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
               updatedAt = :updatedAt
         `,
         ExpressionAttributeValues: {
-          ":periodStart": currentPeriodStart
-            ? new Date(currentPeriodStart * 1000).toISOString()
+          ":periodStart": actualPeriodStart
+            ? new Date(actualPeriodStart * 1000).toISOString()
             : new Date().toISOString(),
-          ":periodEnd": currentPeriodEnd
-            ? new Date(currentPeriodEnd * 1000).toISOString()
+          ":periodEnd": actualPeriodEnd
+            ? new Date(actualPeriodEnd * 1000).toISOString()
             : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           ":updatedAt": new Date().toISOString(),
         },
       })
+    );
+
+    console.log(`✅ User ${userId} period updated in DynamoDB:`);
+    console.log(
+      `   currentPeriodStart: ${new Date(
+        actualPeriodStart * 1000
+      ).toISOString()}`
+    );
+    console.log(
+      `   currentPeriodEnd: ${new Date(actualPeriodEnd * 1000).toISOString()}`
     );
 
     // Store payment record - PaymentIntent will be retrieved from Stripe when needed for refunds
@@ -551,6 +684,31 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     );
 
     console.log(`Payment recorded for user ${userId}`);
+
+    // For renewals, create a new EventBridge rule using the actualPeriodEnd we calculated
+    if (
+      billingReason === "subscription_cycle" ||
+      billingReason === "subscription_update"
+    ) {
+      console.log(
+        `📅 Creating EventBridge rule for next billing: ${new Date(
+          actualPeriodEnd * 1000
+        ).toISOString()}`
+      );
+
+      // Create EventBridge rule for next billing cycle (1 hour before)
+      await createPreBillingCheckRule(
+        userId,
+        subscriptionId,
+        new Date(actualPeriodEnd * 1000)
+      );
+
+      console.log(
+        `✅ EventBridge rule created for renewal of user ${userId} at ${new Date(
+          actualPeriodEnd * 1000
+        ).toISOString()}`
+      );
+    }
   } catch (error) {
     console.error("Error handling successful payment:", error);
     throw error;
