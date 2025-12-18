@@ -26,21 +26,23 @@ export async function createPreBillingCheckRule(
   subscriptionId: string,
   triggerTime: Date
 ): Promise<void> {
-  // Create a shorter hash-based rule name (EventBridge max is 64 chars)
-  // Use first 8 chars of userId + last 8 of subscriptionId for uniqueness
+  // Convert to cron expression in UTC
+  const utcTriggerTime = new Date(triggerTime);
+  const minutes = utcTriggerTime.getUTCMinutes();
+  const hours = utcTriggerTime.getUTCHours();
+  const dayOfMonth = utcTriggerTime.getUTCDate();
+  const month = utcTriggerTime.getUTCMonth() + 1; // Month is 0-indexed
+  const year = utcTriggerTime.getUTCFullYear();
+
+  // Create a unique rule name for each billing period (EventBridge max is 64 chars)
+  // Include year-month to ensure each billing period gets its own rule
+  // Format: pre-billing-{userIdShort}-{subIdShort}-{YYYYMM}
   const userIdShort = userId.substring(0, 8);
   const subIdShort = subscriptionId.slice(-8);
-  const ruleName = `pre-billing-${userIdShort}-${subIdShort}`;
+  const yearMonth = `${year}${month.toString().padStart(2, "0")}`;
+  const ruleName = `pre-billing-${userIdShort}-${subIdShort}-${yearMonth}`;
 
   try {
-    // Convert to cron expression in UTC
-    const utcTriggerTime = new Date(triggerTime);
-    const minutes = utcTriggerTime.getUTCMinutes();
-    const hours = utcTriggerTime.getUTCHours();
-    const dayOfMonth = utcTriggerTime.getUTCDate();
-    const month = utcTriggerTime.getUTCMonth() + 1; // Month is 0-indexed
-    const year = utcTriggerTime.getUTCFullYear();
-
     // Create a one-time schedule expression
     // Format: cron(minutes hours day month ? year)
     const scheduleExpression = `cron(${minutes} ${hours} ${dayOfMonth} ${month} ? ${year})`;

@@ -691,22 +691,22 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       billingReason === "subscription_update"
     ) {
       console.log(
-        `📅 Creating EventBridge rule for next billing: ${new Date(
+        `📅 Stripe will bill at: ${new Date(
           actualPeriodEnd * 1000
         ).toISOString()}`
       );
 
-      // Create EventBridge rule for next billing cycle (1 hour before)
+      // Create EventBridge rule for next billing cycle (1 hour before billing time)
+      const oneHourBeforeBilling = new Date(actualPeriodEnd * 1000 - 3600000); // Subtract 1 hour
+
       await createPreBillingCheckRule(
         userId,
         subscriptionId,
-        new Date(actualPeriodEnd * 1000)
+        oneHourBeforeBilling
       );
 
       console.log(
-        `✅ EventBridge rule created for renewal of user ${userId} at ${new Date(
-          actualPeriodEnd * 1000
-        ).toISOString()}`
+        `✅ EventBridge rule created for renewal of user ${userId} - will fire at ${oneHourBeforeBilling.toISOString()} (1 hour before billing)`
       );
     }
   } catch (error) {
