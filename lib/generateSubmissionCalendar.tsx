@@ -16,6 +16,8 @@ export interface SubmissionDay {
     | "double-checking";
   submissionId?: string;
   submittedAt?: string;
+  // Track which billing period this submission was evaluated for refund
+  refundCheckPeriod?: string; // Format: "2026-01" (year-month when refund was calculated)
 }
 
 export function generateSubmissionCalendar(

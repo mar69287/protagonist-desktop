@@ -142,15 +142,35 @@ export async function POST(request: NextRequest) {
       const submissionCalendar: SubmissionDay[] =
         challenge.submissionCalendar || [];
 
-      // Filter to submissions in billing period
-      // For testing: Temporarily removed deadline check to allow future dates
+      // Get current billing period identifier (year-month)
+      const currentPeriodId = `${checkTime.getUTCFullYear()}-${String(
+        checkTime.getUTCMonth() + 1
+      ).padStart(2, "0")}`;
+
+      // Filter to submissions in billing period with proper criteria:
+      // 1. Submission date is within billing period
+      // 2. Deadline has PASSED (don't evaluate future submissions)
+      // 3. Status is FINAL (verified or denied - skip pending/processing)
+      // 4. NOT already checked in a previous refund period
       const submissionsInPeriod = submissionCalendar.filter((day) => {
         const submissionDate = new Date(day.targetDate);
-        // const deadline = new Date(day.deadline); // Temporarily disabled
-        return (
-          submissionDate >= subscriptionStart && submissionDate <= checkTime
-          // && deadline <= now // Temporarily disabled for testing future dates
-        );
+        const deadline = new Date(day.deadline);
+        const now = new Date();
+
+        // Must be in date range
+        const inDateRange =
+          submissionDate >= subscriptionStart && submissionDate <= checkTime;
+
+        // Deadline must have passed
+        const deadlinePassed = deadline <= now;
+
+        // Status must be final (verified = passed AI check, denied = failed AI check but they tried)
+        const isFinalStatus = day.status === "verified" || day.status === "denied";
+
+        // Not already checked in a previous period
+        const notAlreadyChecked = !day.refundCheckPeriod;
+
+        return inDateRange && deadlinePassed && isFinalStatus && notAlreadyChecked;
       });
 
       allRelevantSubmissions.push(...submissionsInPeriod);
@@ -176,13 +196,14 @@ export async function POST(request: NextRequest) {
       `Total ${allRelevantSubmissions.length} submissions across ${challengesToCheck.length} challenge(s) for billing period`
     );
 
-    // Count verified submissions from submissionCalendar status field
-    const verifiedCount = allRelevantSubmissions.filter(
-      (day) => day.status === "verified"
+    // Count completed submissions: "verified" (passed AI) + "denied" (failed AI but tried)
+    // We count both because the user made an attempt on time
+    const completedCount = allRelevantSubmissions.filter(
+      (day) => day.status === "verified" || day.status === "denied"
     ).length;
 
     console.log(
-      `${verifiedCount} verified out of ${allRelevantSubmissions.length} expected`
+      `${completedCount} completed submissions (verified or denied) out of ${allRelevantSubmissions.length} expected`
     );
 
     // Log status breakdown
@@ -220,14 +241,55 @@ export async function POST(request: NextRequest) {
       `First billing cycle: ${isFirstBillingCycle} (user has ${allUserChallenges.length} total challenge(s))`
     );
 
-    // Calculate refund based on submissionCalendar verified count
+    // Calculate refund based on submissionCalendar completed count (verified + denied)
     const refundCalculation = calculateRefundFromSubmissions(
       allRelevantSubmissions.length,
-      verifiedCount,
+      completedCount,
       isFirstBillingCycle
     );
 
     console.log(`Refund calculation for user ${userId}:`, refundCalculation);
+
+    // Mark all submissions that were included in this refund check
+    // This prevents double-counting in future billing periods
+    const currentPeriodId = `${checkTime.getUTCFullYear()}-${String(
+      checkTime.getUTCMonth() + 1
+    ).padStart(2, "0")}`;
+
+    console.log(
+      `Marking ${allRelevantSubmissions.length} submissions as checked for period ${currentPeriodId}`
+    );
+
+    // Update each challenge's submissionCalendar to mark checked submissions
+    const { UpdateCommand } = await import("@aws-sdk/lib-dynamodb");
+    for (const challenge of challengesToCheck) {
+      const updatedCalendar = (challenge.submissionCalendar || []).map((day) => {
+        // If this submission was included in our check, mark it
+        const wasIncluded = allRelevantSubmissions.some(
+          (sub) => sub.targetDate === day.targetDate
+        );
+        if (wasIncluded) {
+          return { ...day, refundCheckPeriod: currentPeriodId };
+        }
+        return day;
+      });
+
+      await dynamoDb.send(
+        new UpdateCommand({
+          TableName: TableNames.CHALLENGES,
+          Key: { challengeId: challenge.challengeId },
+          UpdateExpression: "SET submissionCalendar = :calendar, updatedAt = :updatedAt",
+          ExpressionAttributeValues: {
+            ":calendar": updatedCalendar,
+            ":updatedAt": new Date().toISOString(),
+          },
+        })
+      );
+
+      console.log(
+        `  Updated challenge ${challenge.challengeId} with refundCheckPeriod markers`
+      );
+    }
 
     // If refund is needed, process it
     if (refundCalculation.refundAmount > 0) {
