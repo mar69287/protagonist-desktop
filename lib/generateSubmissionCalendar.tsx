@@ -64,11 +64,27 @@ export function generateSubmissionCalendar(
 
   const checkDate = moment.tz(startDate, timezone).startOf("day");
   const end = moment.tz(endDate, timezone).endOf("day");
+  const startDay = moment.tz(startDate, timezone).startOf("day");
+
+  // Track if this is the first iteration
+  let isFirstDay = true;
 
   while (checkDate.isSameOrBefore(end)) {
     const dayOfWeek = checkDate.day();
 
     if (selectedDayNumbers.includes(dayOfWeek)) {
+      // Skip if this is the first day and it's the same as the start date
+      if (isFirstDay && checkDate.isSame(startDay, "day")) {
+        console.log(
+          `Skipping first submission day (${checkDate.format(
+            "YYYY-MM-DD"
+          )}) as it's the same as challenge start date`
+        );
+        checkDate.add(1, "day");
+        isFirstDay = false;
+        continue;
+      }
+
       // Create deadline in user's timezone
       const deadlineLocal = checkDate
         .clone()
@@ -90,6 +106,11 @@ export function generateSubmissionCalendar(
         deadlineLocal: deadlineLocalString, // Local time (CORRECTED)
         status: "pending",
       });
+    }
+
+    // Mark that we've passed the first day
+    if (isFirstDay) {
+      isFirstDay = false;
     }
 
     checkDate.add(1, "day");
