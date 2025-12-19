@@ -343,41 +343,8 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
 
       console.log(`User ${userId} updated with challengeId ${challengeId}`);
 
-      // Create EventBridge rule for checking before billing
-      // Schedule check 1 hour before billing period ends
-      if (currentPeriodEnd && !isNaN(currentPeriodEnd)) {
-        const oneHourBeforeBilling = new Date(
-          currentPeriodEnd * 1000 - 3600000
-        );
-
-        // Validate the date is valid
-        if (!isNaN(oneHourBeforeBilling.getTime())) {
-          try {
-            await createPreBillingCheckRule(
-              userId,
-              fullSubscription.id,
-              oneHourBeforeBilling
-            );
-            console.log(
-              `EventBridge rule created for user ${userId} at ${oneHourBeforeBilling.toISOString()}`
-            );
-          } catch (error) {
-            console.error(
-              `Failed to create EventBridge rule for user ${userId}:`,
-              error
-            );
-            // Don't throw - we still want the subscription to succeed
-          }
-        } else {
-          console.error(
-            `Invalid date calculated for EventBridge rule: ${oneHourBeforeBilling}`
-          );
-        }
-      } else {
-        console.error(
-          `Invalid currentPeriodEnd from Stripe: ${currentPeriodEnd}`
-        );
-      }
+      // EventBridge rule will be created in handleInvoicePaymentSucceeded
+      // when we have the paymentId
     } else {
       console.log(
         `User ${userId} has existing payment history - skipping Challenge creation`
@@ -664,51 +631,119 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       `   currentPeriodEnd: ${new Date(actualPeriodEnd * 1000).toISOString()}`
     );
 
-    // Store payment record - PaymentIntent will be retrieved from Stripe when needed for refunds
+    // In API version 2025-10-29.clover, invoices don't include payment_intent directly
+    // We need to list PaymentIntents associated with this invoice
+    let paymentIntentId: string | null = null;
+
+    try {
+      console.log(
+        `🔄 Searching for PaymentIntent associated with invoice ${invoice.id}...`
+      );
+
+      // List PaymentIntents for this customer that match the invoice
+      const paymentIntents = await stripe.paymentIntents.list({
+        customer:
+          typeof invoice.customer === "string"
+            ? invoice.customer
+            : invoice.customer?.id,
+        limit: 10,
+      });
+
+      console.log(
+        `Found ${paymentIntents.data.length} PaymentIntents for customer`
+      );
+
+      // Find the PaymentIntent that matches this invoice
+      const matchingPI = paymentIntents.data.find((pi) => {
+        // Check if amount matches
+        const amountMatches = pi.amount === invoice.amount_paid;
+
+        // Check if status is succeeded
+        const isSucceeded = pi.status === "succeeded";
+
+        // Check if timing is close (within 1 minute of invoice creation)
+        const invoiceTime = invoice.created;
+        const piTime = pi.created;
+        const timeDiff = Math.abs(invoiceTime - piTime);
+        const timeIsClose = timeDiff < 60; // Within 60 seconds
+
+        console.log(
+          `  Checking PI ${pi.id}: amount=${pi.amount} (invoice=${
+            invoice.amount_paid
+          }), status=${pi.status}, timeDiff=${timeDiff}s → match=${
+            amountMatches && isSucceeded && timeIsClose
+          }`
+        );
+
+        return amountMatches && isSucceeded && timeIsClose;
+      });
+
+      if (matchingPI) {
+        paymentIntentId = matchingPI.id;
+        console.log(`✅ Found matching PaymentIntent: ${paymentIntentId}`);
+      } else {
+        console.log(
+          `❌ No matching PaymentIntent found for invoice ${invoice.id}`
+        );
+      }
+    } catch (error) {
+      console.error("Error finding PaymentIntent:", error);
+    }
+
+    console.log(`💳 PaymentIntent ID: ${paymentIntentId || "Not found"}`);
+
+    // Store payment record with PaymentIntent ID
+    const paymentHistoryItem = {
+      paymentId: invoice.id,
+      userId: userId,
+      subscriptionId: subscriptionId,
+      type: "payment",
+      amount: (invoice.amount_paid ?? 0) / 100, // Convert cents to dollars
+      status: "succeeded",
+      stripeInvoiceId: invoice.id,
+      stripeChargeId: null, // Not available in newer API
+      stripePaymentIntentId: paymentIntentId,
+      createdAt: new Date().toISOString(),
+    };
+
+    console.log("📝 About to write PaymentHistory item to DynamoDB:");
+    console.log(JSON.stringify(paymentHistoryItem, null, 2));
+
     await dynamoDb.send(
       new PutCommand({
         TableName: TableNames.PAYMENT_HISTORY,
-        Item: {
-          paymentId: invoice.id,
-          userId: userId,
-          subscriptionId: subscriptionId,
-          type: "payment",
-          amount: (invoice.amount_paid ?? 0) / 100, // Convert cents to dollars
-          status: "succeeded",
-          stripeInvoiceId: invoice.id,
-          stripeChargeId: null, // Not available in newer API
-          stripePaymentIntentId: null, // Will be retrieved from Stripe when needed
-          createdAt: new Date().toISOString(),
-        },
+        Item: paymentHistoryItem,
       })
     );
 
-    console.log(`Payment recorded for user ${userId}`);
+    console.log(
+      `✅ Payment recorded for user ${userId} with PaymentIntent ${paymentIntentId}`
+    );
 
-    // For renewals, create a new EventBridge rule using the actualPeriodEnd we calculated
-    if (
-      billingReason === "subscription_cycle" ||
-      billingReason === "subscription_update"
-    ) {
-      console.log(
-        `📅 Stripe will bill at: ${new Date(
-          actualPeriodEnd * 1000
-        ).toISOString()}`
-      );
+    // Create EventBridge rule for next billing cycle (1 hour before billing time)
+    // Do this for both initial subscriptions and renewals
+    console.log(
+      `📅 Stripe will bill at: ${new Date(
+        actualPeriodEnd * 1000
+      ).toISOString()}`
+    );
 
-      // Create EventBridge rule for next billing cycle (1 hour before billing time)
-      const oneHourBeforeBilling = new Date(actualPeriodEnd * 1000 - 3600000); // Subtract 1 hour
+    const oneHourBeforeBilling = new Date(actualPeriodEnd * 1000 - 3600000); // Subtract 1 hour
 
-      await createPreBillingCheckRule(
-        userId,
-        subscriptionId,
-        oneHourBeforeBilling
-      );
+    await createPreBillingCheckRule(
+      userId,
+      subscriptionId,
+      invoice.id, // Pass the paymentId (invoice ID)
+      oneHourBeforeBilling
+    );
 
-      console.log(
-        `✅ EventBridge rule created for renewal of user ${userId} - will fire at ${oneHourBeforeBilling.toISOString()} (1 hour before billing)`
-      );
-    }
+    const eventType =
+      billingReason === "subscription_create"
+        ? "initial subscription"
+        : "renewal";
+    console.log(
+      `✅ EventBridge rule created for ${eventType} of user ${userId} - will fire at ${oneHourBeforeBilling.toISOString()} (1 hour before billing)`
+    );
   } catch (error) {
     console.error("Error handling successful payment:", error);
     throw error;

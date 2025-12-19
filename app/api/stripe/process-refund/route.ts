@@ -11,13 +11,15 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, subscriptionId, action } = body;
+    const { userId, subscriptionId, paymentId, action } = body;
 
     if (action !== "pre_billing_check") {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
-    console.log(`Processing pre-billing check for user ${userId}`);
+    console.log(
+      `Processing pre-billing check for user ${userId}, payment ${paymentId}`
+    );
 
     // Get the user from DynamoDB
     const userResult = await dynamoDb.send(
@@ -142,11 +144,23 @@ export async function POST(request: NextRequest) {
       const submissionCalendar: SubmissionDay[] =
         challenge.submissionCalendar || [];
 
+      console.log(
+        `\n=== DEBUG: Checking Challenge ${challenge.challengeId} ===`
+      );
+      console.log(
+        `Date Range: ${subscriptionStart.toISOString()} to ${checkTime.toISOString()}`
+      );
+      console.log(`Current time: ${new Date().toISOString()}`);
+      console.log(
+        `Total submissions in calendar: ${submissionCalendar.length}\n`
+      );
+
       // Filter to submissions in billing period with proper criteria:
       // 1. Submission date is within billing period
       // 2. Deadline has PASSED (don't evaluate future submissions)
-      // 3. Status is FINAL (verified or denied - skip pending/processing)
-      // 4. NOT already checked in a previous refund period
+      // 3. NOT already checked in a previous refund period
+      // Note: We include ALL submissions with passed deadlines (verified, denied, missed, pending)
+      // because they all count as "expected" submissions for the refund calculation
       const submissionsInPeriod = submissionCalendar.filter((day) => {
         const submissionDate = new Date(day.targetDate);
         const deadline = new Date(day.deadline);
@@ -159,16 +173,25 @@ export async function POST(request: NextRequest) {
         // Deadline must have passed
         const deadlinePassed = deadline <= now;
 
-        // Status must be final (verified = passed AI check, denied = failed AI check but they tried)
-        const isFinalStatus =
-          day.status === "verified" || day.status === "denied";
-
         // Not already checked in a previous period
         const notAlreadyChecked = !day.refundCheckPeriod;
 
-        return (
-          inDateRange && deadlinePassed && isFinalStatus && notAlreadyChecked
+        // Debug logging for each submission
+        const passes = inDateRange && deadlinePassed && notAlreadyChecked;
+        console.log(
+          `  ${day.targetDate} (${
+            day.status
+          }): inRange=${inDateRange}, deadlinePassed=${deadlinePassed}, notChecked=${notAlreadyChecked} → ${
+            passes ? "✅ INCLUDED" : "❌ EXCLUDED"
+          }`
         );
+        if (!deadlinePassed) {
+          console.log(
+            `    └─ Deadline: ${deadline.toISOString()} vs Now: ${now.toISOString()}`
+          );
+        }
+
+        return inDateRange && deadlinePassed && notAlreadyChecked;
       });
 
       allRelevantSubmissions.push(...submissionsInPeriod);
@@ -194,14 +217,15 @@ export async function POST(request: NextRequest) {
       `Total ${allRelevantSubmissions.length} submissions across ${challengesToCheck.length} challenge(s) for billing period`
     );
 
-    // Count completed submissions: "verified" (passed AI) + "denied" (failed AI but tried)
-    // We count both because the user made an attempt on time
+    // Count successful submissions: ONLY "verified" (passed AI check)
+    // "denied" means they submitted but failed AI check - counts as expected but NOT successful
+    // "missed"/"pending" means they didn't submit - counts as expected but NOT successful
     const completedCount = allRelevantSubmissions.filter(
-      (day) => day.status === "verified" || day.status === "denied"
+      (day) => day.status === "verified"
     ).length;
 
     console.log(
-      `${completedCount} completed submissions (verified or denied) out of ${allRelevantSubmissions.length} expected`
+      `${completedCount} verified submissions out of ${allRelevantSubmissions.length} expected`
     );
 
     // Log status breakdown
@@ -294,11 +318,11 @@ export async function POST(request: NextRequest) {
 
     // If refund is needed, process it
     if (refundCalculation.refundAmount > 0) {
-      await processRefund(userId, subscriptionId, refundCalculation);
+      await processRefund(paymentId, refundCalculation);
     } else {
       console.log(`No refund needed for user ${userId}`);
       // Create a payment history record for the "no refund" decision
-      await recordNoRefund(userId, subscriptionId, refundCalculation);
+      await recordNoRefund(paymentId, refundCalculation);
     }
 
     // Delete the EventBridge rule since it's a one-time trigger
@@ -334,7 +358,14 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Calculate refund based on challengeSubmissions table data
+ * Calculate refund based on submission completion rate
+ *
+ * Calculation:
+ * - Total Expected: All submissions with passed deadlines in billing period
+ * - Successful: Only "verified" submissions (passed AI check)
+ * - Completion Rate: (verified / total expected) * 100
+ *
+ * Note: "denied" submissions count as expected but NOT successful
  *
  * First Billing Cycle:
  * - 90%+ completion: Full refund ($98)
@@ -404,11 +435,10 @@ function calculateRefundFromSubmissions(
 }
 
 /**
- * Process a refund for a user based on their subscription
+ * Process a refund for a specific payment
  */
 async function processRefund(
-  userId: string,
-  subscriptionId: string,
+  paymentId: string,
   refundCalculation: {
     refundAmount: number;
     successfulSubmissions: number;
@@ -417,37 +447,28 @@ async function processRefund(
   }
 ): Promise<void> {
   try {
-    // Get the most recent payment for this subscription
-    const { QueryCommand } = await import("@aws-sdk/lib-dynamodb");
-
+    // Get the payment record directly by ID
     const paymentResult = await dynamoDb.send(
-      new QueryCommand({
+      new GetCommand({
         TableName: TableNames.PAYMENT_HISTORY,
-        IndexName: "userId-createdAt-index",
-        KeyConditionExpression: "userId = :userId",
-        FilterExpression:
-          "subscriptionId = :subscriptionId AND #type = :paymentType AND #status = :succeededStatus",
-        ExpressionAttributeNames: {
-          "#type": "type",
-          "#status": "status",
-        },
-        ExpressionAttributeValues: {
-          ":userId": userId,
-          ":subscriptionId": subscriptionId,
-          ":paymentType": "payment",
-          ":succeededStatus": "succeeded",
-        },
-        ScanIndexForward: false, // Sort descending by createdAt
-        Limit: 1,
+        Key: { paymentId },
       })
     );
 
-    if (!paymentResult.Items || paymentResult.Items.length === 0) {
-      console.error(`No payment found for subscription ${subscriptionId}`);
+    if (!paymentResult.Item) {
+      console.error(`Payment record not found: ${paymentId}`);
       return;
     }
 
-    const payment = paymentResult.Items[0];
+    const payment = paymentResult.Item;
+
+    // Verify this is a payment record
+    if (payment.type !== "payment" || payment.status !== "succeeded") {
+      console.error(
+        `Invalid payment record: type=${payment.type}, status=${payment.status}`
+      );
+      return;
+    }
     const refundAmount = refundCalculation.refundAmount;
 
     console.log(
@@ -547,8 +568,8 @@ async function processRefund(
       amount: Math.round(refundAmount * 100), // Convert to cents
       reason: "requested_by_customer" as const,
       metadata: {
-        userId,
-        subscriptionId,
+        userId: payment.userId,
+        subscriptionId: payment.subscriptionId,
         completionRate: refundCalculation.completionRate.toFixed(2),
         successfulSubmissions:
           refundCalculation.successfulSubmissions.toString(),
@@ -565,8 +586,8 @@ async function processRefund(
         TableName: TableNames.PAYMENT_HISTORY,
         Item: {
           paymentId: refund.id,
-          userId,
-          subscriptionId,
+          userId: payment.userId,
+          subscriptionId: payment.subscriptionId,
           type: "refund",
           amount: refundAmount,
           status: "succeeded",
@@ -579,7 +600,9 @@ async function processRefund(
       })
     );
 
-    console.log(`Refund recorded in payment history for user ${userId}`);
+    console.log(
+      `Refund recorded in payment history for user ${payment.userId}`
+    );
   } catch (error) {
     console.error("Error processing refund:", error);
     throw error;
@@ -590,8 +613,7 @@ async function processRefund(
  * Record a "no refund" decision in payment history for audit trail
  */
 async function recordNoRefund(
-  userId: string,
-  subscriptionId: string,
+  paymentId: string,
   refundCalculation: {
     refundAmount: number;
     successfulSubmissions: number;
@@ -600,36 +622,33 @@ async function recordNoRefund(
   }
 ): Promise<void> {
   try {
-    // Get the most recent payment for this subscription to link to it
-    const { QueryCommand } = await import("@aws-sdk/lib-dynamodb");
+    // Validate paymentId before querying
+    if (!paymentId) {
+      console.error(`No paymentId provided, cannot record no-refund decision`);
+      return;
+    }
 
+    console.log(`📝 Recording no-refund decision for paymentId: ${paymentId}`);
+
+    // Get the payment record directly by ID
     const paymentResult = await dynamoDb.send(
-      new QueryCommand({
+      new GetCommand({
         TableName: TableNames.PAYMENT_HISTORY,
-        IndexName: "userId-createdAt-index",
-        KeyConditionExpression: "userId = :userId",
-        FilterExpression:
-          "subscriptionId = :subscriptionId AND #type = :paymentType AND #status = :succeededStatus",
-        ExpressionAttributeNames: {
-          "#type": "type",
-          "#status": "status",
-        },
-        ExpressionAttributeValues: {
-          ":userId": userId,
-          ":subscriptionId": subscriptionId,
-          ":paymentType": "payment",
-          ":succeededStatus": "succeeded",
-        },
-        ScanIndexForward: false, // Sort descending by createdAt
-        Limit: 1,
+        Key: { paymentId },
       })
     );
 
-    const payment = paymentResult.Items?.[0];
+    const payment = paymentResult.Item;
+
+    if (!payment) {
+      console.error(`Payment record not found: ${paymentId}`);
+      return;
+    }
+
     const timestamp = new Date().toISOString();
 
     // Create a unique ID for this no-refund record
-    const noRefundRecordId = `no-refund-${userId}-${subscriptionId}-${timestamp}`;
+    const noRefundRecordId = `no-refund-${payment.userId}-${payment.subscriptionId}-${timestamp}`;
 
     // Record the no-refund decision in payment history
     await dynamoDb.send(
@@ -637,13 +656,13 @@ async function recordNoRefund(
         TableName: TableNames.PAYMENT_HISTORY,
         Item: {
           paymentId: noRefundRecordId,
-          userId,
-          subscriptionId,
+          userId: payment.userId,
+          subscriptionId: payment.subscriptionId,
           type: "refund",
           amount: 0,
           status: "not_eligible",
-          stripeInvoiceId: payment?.stripeInvoiceId || null,
-          stripePaymentIntentId: payment?.stripePaymentIntentId || null,
+          stripeInvoiceId: payment.stripeInvoiceId || null,
+          stripePaymentIntentId: payment.stripePaymentIntentId || null,
           stripeChargeId: null,
           refundReason: `No refund: ${
             refundCalculation.successfulSubmissions
@@ -658,9 +677,9 @@ async function recordNoRefund(
     );
 
     console.log(
-      `No-refund decision recorded in payment history for user ${userId}: ${refundCalculation.completionRate.toFixed(
-        2
-      )}% completion`
+      `No-refund decision recorded in payment history for user ${
+        payment.userId
+      }: ${refundCalculation.completionRate.toFixed(2)}% completion`
     );
   } catch (error) {
     console.error("Error recording no-refund decision:", error);

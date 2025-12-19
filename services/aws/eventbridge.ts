@@ -24,6 +24,7 @@ const eventBridgeClient = new EventBridgeClient({
 export async function createPreBillingCheckRule(
   userId: string,
   subscriptionId: string,
+  paymentId: string,
   triggerTime: Date
 ): Promise<void> {
   // Convert to cron expression in UTC
@@ -86,6 +87,7 @@ export async function createPreBillingCheckRule(
             Input: JSON.stringify({
               userId,
               subscriptionId,
+              paymentId,
               action: "pre_billing_check",
               scheduledTime: triggerTime.toISOString(),
             }),
