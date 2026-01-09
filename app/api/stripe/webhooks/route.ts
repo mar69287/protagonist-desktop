@@ -654,28 +654,31 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       );
 
       // Find the PaymentIntent that matches this invoice
-      const matchingPI = paymentIntents.data.find((pi) => {
-        // Check if amount matches
+      // Filter by amount and status, then pick the one with closest timestamp
+      const candidatePaymentIntents = paymentIntents.data.filter((pi) => {
         const amountMatches = pi.amount === invoice.amount_paid;
-
-        // Check if status is succeeded
         const isSucceeded = pi.status === "succeeded";
+        return amountMatches && isSucceeded;
+      });
 
-        // Check if timing is close (within 1 minute of invoice creation)
-        const invoiceTime = invoice.created;
-        const piTime = pi.created;
-        const timeDiff = Math.abs(invoiceTime - piTime);
-        const timeIsClose = timeDiff < 60; // Within 60 seconds
+      // Sort by time difference and take the closest one
+      const matchingPI = candidatePaymentIntents.sort((a, b) => {
+        const aDiff = Math.abs(invoice.created - a.created);
+        const bDiff = Math.abs(invoice.created - b.created);
+        return aDiff - bDiff;
+      })[0];
 
+      // Log all candidates for debugging
+      candidatePaymentIntents.forEach((pi) => {
+        const timeDiff = Math.abs(invoice.created - pi.created);
+        const isMatch = pi === matchingPI;
         console.log(
           `  Checking PI ${pi.id}: amount=${pi.amount} (invoice=${
             invoice.amount_paid
-          }), status=${pi.status}, timeDiff=${timeDiff}s → match=${
-            amountMatches && isSucceeded && timeIsClose
+          }), status=${pi.status}, timeDiff=${timeDiff}s → ${
+            isMatch ? "✅ SELECTED (closest)" : "❌ not closest"
           }`
         );
-
-        return amountMatches && isSucceeded && timeIsClose;
       });
 
       if (matchingPI) {
