@@ -220,13 +220,25 @@ export default function WheelOfLifeScreen({
   useEffect(() => {
     if (!isPressing || !holdStartTime) return;
 
-    const interval = setInterval(() => {
+    let animationFrameId: number;
+
+    const updatePercentage = () => {
       const elapsed = Date.now() - holdStartTime;
       const percentage = Math.min(100, (elapsed / 4286) * 100);
       setHoldPercentage(percentage);
-    }, 16);
 
-    return () => clearInterval(interval);
+      if (percentage < 100) {
+        animationFrameId = requestAnimationFrame(updatePercentage);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(updatePercentage);
+
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
   }, [isPressing, holdStartTime]);
 
   // Add global mouse up listener to catch releases outside the element
@@ -337,7 +349,6 @@ export default function WheelOfLifeScreen({
               displayPercentage / 100
             })`,
             maxHeight: "calc(100vh - 4rem - 4rem - 3.5rem)",
-            transition: "height 0.1s linear",
             background: `linear-gradient(to top, ${getColorForPercentage(
               displayPercentage
             )}, ${getColorForPercentage(
@@ -375,7 +386,7 @@ export default function WheelOfLifeScreen({
 
       {/* Content */}
       <motion.div
-        className="relative z-10 flex flex-col min-h-screen p-4 md:p-8 pb-24"
+        className="relative z-10 flex flex-col min-h-screen p-4 md:p-8 pb-16"
         initial={{ opacity: 0 }}
         animate={{ opacity: fadeIn ? 1 : 0 }}
         transition={{ duration: 0.5 }}
@@ -427,7 +438,6 @@ export default function WheelOfLifeScreen({
                 onTouchEnd={handleMouseUp}
                 onTouchCancel={handleMouseUp}
                 onContextMenu={(e) => e.preventDefault()}
-                style={{ touchAction: "none" }}
               />
 
               {/* Circular Press Button (Left Side) */}
@@ -468,16 +478,17 @@ export default function WheelOfLifeScreen({
         </div>
 
         {/* Progress Navigator */}
-        <div className="flex items-center justify-between gap-2 md:gap-4 mt-4 md:mt-6 pb-3 md:pb-4 px-3 md:px-4">
+        <div className="flex items-center justify-between gap-2 md:gap-4 mt-4 md:mt-6 pb-6 md:pb-4 px-3 md:px-4">
           {/* Back Button - Circular */}
           <button
             onClick={handleNavigateBack}
             disabled={currentAreaIndex === 0}
-            className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center font-bold text-xl md:text-2xl transition-all shrink-0 ${
+            className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center font-bold text-xl md:text-2xl transition-all shrink-0 leading-none ${
               currentAreaIndex === 0
                 ? "bg-gray-800/30 text-gray-600 cursor-not-allowed opacity-30"
                 : "bg-gray-700 text-white hover:bg-gray-600 border border-gray-600"
             }`}
+            style={{ paddingTop: "2px" }}
           >
             ←
           </button>
@@ -518,11 +529,12 @@ export default function WheelOfLifeScreen({
           <button
             onClick={handleNavigateForward}
             disabled={values[currentArea] === undefined}
-            className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center font-bold text-xl md:text-2xl transition-all shrink-0 ${
+            className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center font-bold text-xl md:text-2xl transition-all shrink-0 leading-none ${
               values[currentArea] === undefined
                 ? "bg-gray-800/30 text-gray-600 cursor-not-allowed opacity-30"
                 : "bg-white text-black hover:bg-gray-100"
             }`}
+            style={{ paddingTop: "2px" }}
           >
             →
           </button>
