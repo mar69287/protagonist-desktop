@@ -100,18 +100,28 @@ export default function OnboardingPage() {
     console.log(JSON.stringify(wheelData, null, 2));
 
     setWheelData(wheelData);
-    setPhase("plan");
-    setMessages([]);
-
-    // Show loading dots for 3 seconds
-    setIsLoading(true);
+    
+    // Fade to black before transitioning
+    setFadeIn(false);
 
     setTimeout(() => {
-      // After 3 seconds, hide loading and show "Got It." message
-      setIsLoading(false);
+      setPhase("plan");
+      setMessages([]);
+      
+      // Fade in after phase change
+      setTimeout(() => {
+        setFadeIn(true);
+      }, 100);
 
-      const initialUserMessage: Message = {
-        role: "user",
+      // Show loading dots for 3 seconds
+      setIsLoading(true);
+
+      setTimeout(() => {
+        // After 3 seconds, hide loading and show "Got It." message
+        setIsLoading(false);
+
+        const initialUserMessage: Message = {
+          role: "user",
         content: "Got It.",
       };
       setMessages([initialUserMessage]);
@@ -162,6 +172,7 @@ export default function OnboardingPage() {
         }
       }, 3000);
     }, 3000);
+    }, 500); // Wait for fade to black
   };
 
   // ==================== PLAN PHASE ====================

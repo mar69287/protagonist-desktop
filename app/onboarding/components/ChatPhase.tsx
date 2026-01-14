@@ -1,7 +1,9 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import ChatBackground from "./ChatBackground";
+import SequentialTextDisplay from "./SequentialTextDisplay";
 
 interface Message {
   role: "user" | "assistant";
@@ -30,27 +32,64 @@ export default function ChatPhase({
   onBack,
 }: ChatPhaseProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [displayedMessages, setDisplayedMessages] = useState<Message[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollTo({ top: 0, behavior: "instant" });
+    }
+  }, []);
 
   // Filter to only show assistant messages and the initial "Got It." user message
   const assistantMessages = messages.filter(
     (msg) => msg.role === "assistant" || msg.content === "Got It."
   );
 
-  // Update displayed messages when new messages arrive
+  // Calculate item height based on viewport
+  const ITEM_HEIGHT_VH = 60; // 60% of viewport height
+
+  // Auto-scroll to latest message when new messages arrive
   useEffect(() => {
-    setDisplayedMessages(assistantMessages);
+    if (assistantMessages.length > 0) {
+      const timer = setTimeout(() => {
+        const lastIndex = assistantMessages.length - 1;
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollTo({
+            top: lastIndex * (window.innerHeight * (ITEM_HEIGHT_VH / 100)),
+            behavior: "smooth",
+          });
+        }
+        setCurrentIndex(lastIndex);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
   }, [assistantMessages.length]);
 
-  // Auto-scroll to latest message
+  // Scroll to loading indicator when loading starts
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+    if (isLoading && assistantMessages.length > 0) {
+      const timer = setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollTo({
+            top:
+              assistantMessages.length *
+              (window.innerHeight * (ITEM_HEIGHT_VH / 100)),
+            behavior: "smooth",
+          });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [displayedMessages.length, isLoading]);
+  }, [isLoading, assistantMessages.length]);
+
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = event.currentTarget.scrollTop;
+    const itemHeight = window.innerHeight * (ITEM_HEIGHT_VH / 100);
+    const index = Math.round(scrollTop / itemHeight);
+    setCurrentIndex(Math.max(0, Math.min(index, assistantMessages.length - 1)));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,121 +99,192 @@ export default function ChatPhase({
   };
 
   const renderFormattedText = (text: string) => {
-    if (!text || typeof text !== "string") return text;
+    if (!text || typeof text !== "string") return <span>{text}</span>;
 
     // Split by **bold** and *italic* patterns
     const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
 
-    return parts.map((part, index) => {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        return (
-          <strong key={index} className="font-bold">
-            {part.slice(2, -2)}
-          </strong>
-        );
-      } else if (part.startsWith("*") && part.endsWith("*")) {
-        return (
-          <em key={index} className="italic">
-            {part.slice(1, -1)}
-          </em>
-        );
-      }
-      return part;
-    });
+    return (
+      <>
+        {parts.map((part, index) => {
+          if (part.startsWith("**") && part.endsWith("**")) {
+            return (
+              <strong key={index} className="font-bold">
+                {part.slice(2, -2)}
+              </strong>
+            );
+          } else if (part.startsWith("*") && part.endsWith("*")) {
+            return (
+              <em key={index} className="italic">
+                {part.slice(1, -1)}
+              </em>
+            );
+          }
+          return <span key={index}>{part}</span>;
+        })}
+      </>
+    );
   };
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black">
-      {/* Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-900 to-black" />
+    <div className="fixed inset-0 w-full h-screen bg-black overflow-hidden">
+      {/* Chat Background */}
+      <ChatBackground />
 
       {/* Content */}
       <motion.div
-        className="relative z-10 flex flex-col h-full"
+        className="relative z-10 w-full h-full flex flex-col"
         initial={{ opacity: 0 }}
         animate={{ opacity: fadeIn ? 1 : 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-4 md:px-8 pt-20 pb-8">
-          <div className="max-w-3xl mx-auto space-y-8">
-            {displayedMessages.map((message, index) => (
-              <motion.div
-                key={index}
-                className="text-center"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-              >
-                <p className="text-base md:text-lg text-gray-300 leading-relaxed">
-                  {renderFormattedText(message.content)}
-                </p>
-              </motion.div>
-            ))}
+        {/* Messages - Scroll Wheel */}
+        <div className="absolute inset-0">
+          <div
+            ref={messagesEndRef}
+            className="w-full h-full overflow-y-auto scroll-smooth"
+            style={{
+              scrollSnapType: "y mandatory",
+              WebkitOverflowScrolling: "touch",
+            }}
+            onScroll={handleScroll}
+          >
+            <div
+              className="px-6 md:px-8"
+              style={{
+                paddingTop: "5rem",
+                paddingBottom: `${40}vh`,
+              }}
+            >
+              {assistantMessages.map((message, index) => (
+                <div
+                  key={index}
+                  className="flex items-start pt-8"
+                  style={{
+                    minHeight: `${ITEM_HEIGHT_VH}vh`,
+                    scrollSnapAlign: "start",
+                  }}
+                >
+                  <div
+                    className={`w-full transition-opacity duration-300 ${
+                      currentIndex === index ? "opacity-100" : "opacity-0"
+                    }`}
+                  >
+                    {message.role === "assistant" &&
+                    index === assistantMessages.length - 1 ? (
+                      // Apply sequential display to the most recent assistant message
+                      <SequentialTextDisplay
+                        text={message.content}
+                        className="text-base md:text-lg text-gray-300 leading-relaxed text-left"
+                        minDuration={2000}
+                        maxDuration={8000}
+                        wordsPerMinute={200}
+                        fadeDuration={0.4}
+                        renderFormattedText={(text) => (
+                          <p className="text-base md:text-lg text-gray-300 leading-relaxed text-left">
+                            {renderFormattedText(text)}
+                          </p>
+                        )}
+                        maxScrollHeight="15vh"
+                      />
+                    ) : (
+                      // Show older messages normally
+                      <p className="text-base md:text-lg text-gray-300 leading-relaxed text-left">
+                        {renderFormattedText(message.content)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
 
-            {isLoading && (
-              <motion.div
-                className="flex justify-center items-center gap-2"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-              >
+              {/* Loading Indicator */}
+              {isLoading && (
                 <div
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                />
-                <div
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                />
-                <div
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                />
-              </motion.div>
-            )}
-
-            <div ref={messagesEndRef} />
+                  className="flex items-start pt-8"
+                  style={{
+                    height: `${ITEM_HEIGHT_VH}vh`,
+                    scrollSnapAlign: "start",
+                  }}
+                >
+                  <div className="flex gap-2">
+                    <motion.div
+                      className="w-2 h-2 bg-gray-400 rounded-full"
+                      animate={{ y: [0, -8, 0] }}
+                      transition={{
+                        duration: 0.6,
+                        repeat: Infinity,
+                        delay: 0,
+                      }}
+                    />
+                    <motion.div
+                      className="w-2 h-2 bg-gray-400 rounded-full"
+                      animate={{ y: [0, -8, 0] }}
+                      transition={{
+                        duration: 0.6,
+                        repeat: Infinity,
+                        delay: 0.15,
+                      }}
+                    />
+                    <motion.div
+                      className="w-2 h-2 bg-gray-400 rounded-full"
+                      animate={{ y: [0, -8, 0] }}
+                      transition={{
+                        duration: 0.6,
+                        repeat: Infinity,
+                        delay: 0.3,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Input Area */}
-        <div className="px-4 md:px-8 pb-8">
-          <form
-            onSubmit={handleSubmit}
-            className="max-w-3xl mx-auto flex gap-2 items-end"
-          >
-            <textarea
-              value={inputValue}
-              onChange={(e) => onInputChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (inputValue.trim() && !isLoading) {
-                    onSend();
-                  }
-                }
-              }}
-              placeholder="Share what's on your mind..."
-              disabled={isLoading}
-              className="flex-1 bg-transparent border-b border-gray-600 text-white placeholder-gray-500 px-4 py-3 resize-none focus:outline-none focus:border-white transition-colors"
-              rows={1}
-              style={{
-                minHeight: "50px",
-                maxHeight: "200px",
-              }}
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !inputValue.trim()}
-              className={`px-6 py-3 font-semibold rounded-lg transition-colors ${
-                isLoading || !inputValue.trim()
-                  ? "bg-gray-800 text-gray-600 cursor-not-allowed"
-                  : "bg-white text-black hover:bg-gray-100"
-              }`}
+        <div className="absolute bottom-0 left-0 right-0 z-20">
+          <div className="p-6">
+            <form
+              onSubmit={handleSubmit}
+              className="flex flex-row items-end gap-2 bg-transparent rounded-[22px] p-1.5"
             >
-              Send
-            </button>
-          </form>
+              <textarea
+                value={inputValue}
+                onChange={(e) => onInputChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (inputValue.trim() && !isLoading) {
+                      onSend();
+                    }
+                  }
+                }}
+                placeholder="Share what's on your mind..."
+                disabled={isLoading}
+                className="flex-1 p-4 text-base font-normal text-white bg-transparent border-none rounded-[22px] resize-none outline-none placeholder-[#a0a0a0] leading-[22px]"
+                rows={1}
+                style={{
+                  fontFamily: "'HelveticaNeue', system-ui, sans-serif",
+                  minHeight: "50px",
+                  maxHeight: "200px",
+                }}
+              />
+              <button
+                type="submit"
+                disabled={isLoading || !inputValue.trim()}
+                className={`px-4 py-2 bg-transparent border-none text-base font-semibold transition-colors ${
+                  isLoading || !inputValue.trim()
+                    ? "text-[#a0a0a0] cursor-not-allowed"
+                    : "text-white cursor-pointer"
+                }`}
+                style={{
+                  fontFamily: "'HelveticaNeue', system-ui, sans-serif",
+                }}
+              >
+                Send
+              </button>
+            </form>
+          </div>
         </div>
       </motion.div>
     </div>
