@@ -137,6 +137,9 @@ export default function WheelOfLifeScreen({
   const lottieRef = useRef<any>(null);
 
   useEffect(() => {
+    // Scroll to top when component mounts
+    window.scrollTo({ top: 0, behavior: "instant" });
+
     fetch("/bg-reality-check-bars.json")
       .then((response) => response.json())
       .then((data) => setAnimationData(data));
@@ -303,10 +306,10 @@ export default function WheelOfLifeScreen({
   const Icon = AREA_ICONS[currentArea];
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black">
-      {/* Lottie Background */}
+    <div className="relative w-full min-h-screen bg-black">
+      {/* Lottie Background - Fixed */}
       {animationData && (
-        <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="fixed inset-0 pointer-events-none z-0">
           <Lottie
             lottieRef={lottieRef}
             animationData={animationData}
@@ -325,10 +328,10 @@ export default function WheelOfLifeScreen({
         </div>
       )}
 
-      {/* Liquid Fill Animation - Full screen width, from bottom up */}
+      {/* Liquid Fill Animation - Fixed, from bottom up */}
       {displayPercentage > 0 && (
         <div
-          className="absolute left-0 right-0 bottom-0 z-5 pointer-events-none"
+          className="fixed left-0 right-0 bottom-0 z-5 pointer-events-none"
           style={{
             height: `calc((100vh - 4rem - 4rem - 3.5rem) * ${
               displayPercentage / 100
@@ -372,7 +375,7 @@ export default function WheelOfLifeScreen({
 
       {/* Content */}
       <motion.div
-        className="relative z-10 flex flex-col h-full p-4 md:p-8"
+        className="relative z-10 flex flex-col min-h-screen p-4 md:p-8 pb-24"
         initial={{ opacity: 0 }}
         animate={{ opacity: fadeIn ? 1 : 0 }}
         transition={{ duration: 0.5 }}

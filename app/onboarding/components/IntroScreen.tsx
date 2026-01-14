@@ -187,11 +187,15 @@ export default function IntroScreen({ fadeIn, onStart }: IntroScreenProps) {
     setTimeout(() => {
       if (currentScreen === 0) {
         setCurrentScreen(1);
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: "instant" });
         // Reset fade to black for next screen
         setTimeout(() => {
           setFadeToBlack(false);
         }, 100);
       } else {
+        // Scroll to top before transitioning to next phase
+        window.scrollTo({ top: 0, behavior: "instant" });
         onStart();
       }
     }, 500); // Wait for fade to black
