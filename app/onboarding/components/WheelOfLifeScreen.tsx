@@ -483,14 +483,23 @@ export default function WheelOfLifeScreen({
           <button
             onClick={handleNavigateBack}
             disabled={currentAreaIndex === 0}
-            className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center font-bold text-xl md:text-2xl transition-all shrink-0 leading-none ${
+            className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center font-bold text-xl md:text-2xl transition-all shrink-0 ${
               currentAreaIndex === 0
                 ? "bg-gray-800/30 text-gray-600 cursor-not-allowed opacity-30"
                 : "bg-gray-700 text-white hover:bg-gray-600 border border-gray-600"
             }`}
-            style={{ paddingTop: "2px" }}
+            style={{ lineHeight: "0" }}
           >
-            ←
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                paddingBottom: "3px",
+              }}
+            >
+              ←
+            </span>
           </button>
 
           {/* Icons */}
@@ -529,14 +538,23 @@ export default function WheelOfLifeScreen({
           <button
             onClick={handleNavigateForward}
             disabled={values[currentArea] === undefined}
-            className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center font-bold text-xl md:text-2xl transition-all shrink-0 leading-none ${
+            className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center font-bold text-xl md:text-2xl transition-all shrink-0 ${
               values[currentArea] === undefined
                 ? "bg-gray-800/30 text-gray-600 cursor-not-allowed opacity-30"
                 : "bg-white text-black hover:bg-gray-100"
             }`}
-            style={{ paddingTop: "2px" }}
+            style={{ lineHeight: "0" }}
           >
-            →
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                paddingBottom: "3px",
+              }}
+            >
+              →
+            </span>
           </button>
         </div>
       </motion.div>
