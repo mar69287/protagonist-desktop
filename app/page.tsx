@@ -1,137 +1,119 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Target, TrendingUp, Award } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+
+// Dynamically import Lottie to avoid SSR issues
+const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 export default function Home() {
+  const [animationData, setAnimationData] = useState(null);
+  const [fadeIn, setFadeIn] = useState(false);
+
+  useEffect(() => {
+    // Load the Lottie animation
+    fetch("/intial-home-screen.json")
+      .then((response) => response.json())
+      .then((data) => setAnimationData(data));
+
+    // Trigger fade-in animation
+    const timer = setTimeout(() => setFadeIn(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-black">
-      {/* Hero Section */}
-      <section className="relative px-4 sm:px-6 lg:px-8 pt-32 pb-20">
-        <div className="max-w-4xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold text-white mb-6">
-              Protagonist
-            </h1>
-            <p className="text-xl sm:text-2xl text-[#a0a0a0] mb-4">
-              Get Paid to Accomplish Your Goals
-            </p>
-            <p className="text-base sm:text-lg text-[#a0a0a0] max-w-2xl mx-auto mb-12">
-              Transform your aspirations into achievements with accountability
-              that matters. Set goals, commit to them, and earn rewards as you
-              succeed.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link href="/login">
-                <motion.button
-                  className="px-8 py-4 bg-white text-black font-semibold rounded-xl hover:bg-[#f5f5f5] transition-colors w-full sm:w-auto"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Log In
-                </motion.button>
-              </Link>
-              <Link href="/subscriptions/signup">
-                <motion.button
-                  className="px-8 py-4 glass-light text-white font-semibold rounded-xl hover:bg-[rgba(255,255,255,0.15)] transition-colors w-full sm:w-auto"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Get Started
-                </motion.button>
-              </Link>
-            </div>
-          </motion.div>
+    <div className="relative min-h-screen w-full bg-black overflow-hidden">
+      {/* Lottie Background */}
+      {animationData && (
+        <div className="absolute inset-0 w-full h-full">
+          <Lottie
+            animationData={animationData}
+            loop={true}
+            autoplay={true}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+            rendererSettings={{
+              preserveAspectRatio: "xMidYMid slice",
+            }}
+          />
         </div>
-      </section>
+      )}
 
-      {/* Features Section */}
-      <section className="relative px-4 sm:px-6 lg:px-8 py-20">
-        <div className="max-w-6xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-8"
+      {/* Dark overlay for text readability */}
+      <div className="absolute inset-0 bg-black/30" />
+
+      {/* Content */}
+      <motion.div
+        className="relative z-10 flex flex-col h-screen p-8 pt-16"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: fadeIn ? 1 : 0 }}
+        transition={{ duration: 0.8 }}
+      >
+        {/* App name at top */}
+        <div className="flex justify-center items-center pt-4">
+          <h1
+            className="text-2xl md:text-5xl font-extrabold text-white tracking-[0.125em]"
+            style={{
+              textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
+            }}
           >
-            {/* Feature 1 */}
-            <div className="glass-light rounded-2xl p-8 hover:bg-[rgba(255,255,255,0.15)] transition-colors">
-              <Target className="w-12 h-12 text-white mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-3">
-                Define Your Goals
-              </h3>
-              <p className="text-[#a0a0a0]">
-                Interactive chat-based onboarding guides you through setting
-                meaningful, achievable goals.
-              </p>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="glass-light rounded-2xl p-8 hover:bg-[rgba(255,255,255,0.15)] transition-colors">
-              <Award className="w-12 h-12 text-white mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-3">
-                Commit & Sign
-              </h3>
-              <p className="text-[#a0a0a0]">
-                Create a commitment contract that holds you accountable to your
-                aspirations.
-              </p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="glass-light rounded-2xl p-8 hover:bg-[rgba(255,255,255,0.15)] transition-colors">
-              <TrendingUp className="w-12 h-12 text-white mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-3">
-                Track & Earn
-              </h3>
-              <p className="text-[#a0a0a0]">
-                Monitor your progress and get rewarded as you accomplish your
-                committed goals.
-              </p>
-            </div>
-          </motion.div>
+            Protagonist
+          </h1>
         </div>
-      </section>
 
-      {/* About Section */}
-      <section className="relative px-4 sm:px-6 lg:px-8 py-20">
-        <div className="max-w-3xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="glass-light rounded-2xl p-10 text-center"
+        {/* Spacer to push buttons to center */}
+        <div className="flex-1" />
+
+        {/* Buttons at bottom center */}
+        <div className="flex flex-row justify-between items-center w-full max-w-4xl mx-auto px-8 md:px-16">
+          <motion.button
+            onClick={() => {
+              // Fade to black before navigating
+              const overlay = document.createElement("div");
+              overlay.style.cssText =
+                "position: fixed; inset: 0; background: black; z-index: 9999; opacity: 0; transition: opacity 0.5s ease-in-out;";
+              document.body.appendChild(overlay);
+
+              setTimeout(() => {
+                overlay.style.opacity = "1";
+              }, 10);
+
+              setTimeout(() => {
+                window.location.href = "/onboarding";
+              }, 500);
+            }}
+            className="px-4 py-2 text-white text-xl md:text-2xl font-semibold cursor-pointer"
+            style={{
+              textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
+            }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Your Journey Starts Here
-            </h2>
-            <p className="text-lg text-[#a0a0a0] mb-6">
-              Protagonist is a mobile app available on iOS and Android that
-              combines goal-setting psychology with financial incentives. Define
-              what matters, commit to your plan, and let us help you become the
-              protagonist of your own success story.
-            </p>
-            <Link href="/subscriptions/signup">
-              <motion.button
-                className="px-6 py-3 bg-white text-black font-semibold rounded-xl hover:bg-[#f5f5f5] transition-colors"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Start Your Journey
-              </motion.button>
-            </Link>
-          </motion.div>
+            Begin
+          </motion.button>
+
+          <Link href="/login">
+            <motion.button
+              className="px-4 py-2 text-white text-xl md:text-2xl font-semibold"
+              style={{
+                textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
+              }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Continue
+            </motion.button>
+          </Link>
         </div>
-      </section>
+
+        {/* Bottom spacer */}
+        <div className="flex-1" />
+      </motion.div>
     </div>
   );
 }

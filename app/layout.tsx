@@ -32,9 +32,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen bg-black`}
       >
         <AuthProvider>
-          <Navbar />
-          <div className="flex-1 pt-20">{children}</div>
-          <Footer />
+          {/* <Navbar /> */}
+          <div className="flex-1">{children}</div>
+          {/* <Footer /> */}
         </AuthProvider>
       </body>
     </html>
