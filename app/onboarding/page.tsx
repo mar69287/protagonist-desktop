@@ -100,14 +100,14 @@ export default function OnboardingPage() {
     console.log(JSON.stringify(wheelData, null, 2));
 
     setWheelData(wheelData);
-    
+
     // Fade to black before transitioning
     setFadeIn(false);
 
     setTimeout(() => {
       setPhase("plan");
       setMessages([]);
-      
+
       // Fade in after phase change
       setTimeout(() => {
         setFadeIn(true);
@@ -122,56 +122,59 @@ export default function OnboardingPage() {
 
         const initialUserMessage: Message = {
           role: "user",
-        content: "Got It.",
-      };
-      setMessages([initialUserMessage]);
+          content: "Got It.",
+        };
+        setMessages([initialUserMessage]);
 
-      // Wait another 3 seconds before calling API
-      setTimeout(async () => {
-        setIsLoading(true);
+        // Wait another 3 seconds before calling API
+        setTimeout(async () => {
+          setIsLoading(true);
 
-        try {
-          const payload = {
-            messages: [],
-            wheel_data: { areas: wheelData },
-          };
+          try {
+            const payload = {
+              messages: [],
+              wheel_data: { areas: wheelData },
+            };
 
-          console.log("=== Sending Wheel Data to AI API (/chat/plan) ===");
-          console.log(JSON.stringify(payload, null, 2));
+            console.log("=== Sending Wheel Data to AI API (/chat/plan) ===");
+            console.log(JSON.stringify(payload, null, 2));
 
-          const response = await fetch(`${API_BASE}/chat/plan`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+            const response = await fetch(`${API_BASE}/chat/plan`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
 
-          if (!response.ok) throw new Error(`API error: ${response.status}`);
+            if (!response.ok) throw new Error(`API error: ${response.status}`);
 
-          const data = await response.json();
-          const aiMessage: Message = {
-            role: "assistant",
-            content:
-              data.message ||
-              data.response ||
-              "Let's create a plan based on your wheel of life assessment.",
-          };
+            const data = await response.json();
+            const aiMessage: Message = {
+              role: "assistant",
+              content:
+                data.message ||
+                data.response ||
+                "Let's create a plan based on your wheel of life assessment.",
+            };
 
-          setMessages((prev) => [...prev, aiMessage]);
-          setPlanStartIndex(0);
-          setIsLoading(false);
-        } catch (error) {
-          console.error("Error fetching initial plan message:", error);
-          const fallbackMessage: Message = {
-            role: "assistant",
-            content:
-              "Great! Now let's create a plan based on your wheel of life assessment. What area would you like to focus on improving?",
-          };
-          setMessages((prev) => [...prev, fallbackMessage]);
-          setPlanStartIndex(0);
-          setIsLoading(false);
-        }
+            console.log("=== AI RESPONSE (Plan Initial) ===");
+            console.log(aiMessage.content);
+
+            setMessages((prev) => [...prev, aiMessage]);
+            setPlanStartIndex(0);
+            setIsLoading(false);
+          } catch (error) {
+            console.error("Error fetching initial plan message:", error);
+            const fallbackMessage: Message = {
+              role: "assistant",
+              content:
+                "Great! Now let's create a plan based on your wheel of life assessment. What area would you like to focus on improving?",
+            };
+            setMessages((prev) => [...prev, fallbackMessage]);
+            setPlanStartIndex(0);
+            setIsLoading(false);
+          }
+        }, 3000);
       }, 3000);
-    }, 3000);
     }, 500); // Wait for fade to black
   };
 
@@ -197,8 +200,8 @@ export default function OnboardingPage() {
         wheel_data: wheelData ? { areas: wheelData } : undefined,
       };
 
-      console.log("=== Sending to AI API (/chat/plan) ===");
-      console.log(JSON.stringify(payload, null, 2));
+      // console.log("=== Sending to AI API (/chat/plan) ===");
+      // console.log(JSON.stringify(payload, null, 2));
 
       const response = await fetch(`${API_BASE}/chat/plan`, {
         method: "POST",
@@ -219,6 +222,10 @@ export default function OnboardingPage() {
           role: "assistant",
           content: data.response,
         };
+
+        console.log("=== AI RESPONSE (Plan Phase) ===");
+        console.log(assistantMessage.content);
+
         setMessages([...updatedMessages, assistantMessage]);
       }
       setIsLoading(false);
@@ -253,6 +260,9 @@ export default function OnboardingPage() {
         role: "assistant",
         content: data.response,
       };
+
+      console.log("=== AI RESPONSE (Accountability Initial) ===");
+      console.log(assistantMessage.content);
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
@@ -299,13 +309,18 @@ export default function OnboardingPage() {
         role: "assistant",
         content: data.response,
       };
+
+      console.log("=== AI RESPONSE (Accountability Phase) ===");
+      console.log(assistantMessage.content);
+
       const messagesWithResponse = [...updatedMessages, assistantMessage];
       setMessages(messagesWithResponse);
       setIsLoading(false);
 
       if (data.metadata && data.metadata.accountability_complete) {
         console.log("Accountability complete - generating commitment...");
-        await generateCommitment(messagesWithResponse);
+        // Start commitment API call immediately while showing the last message
+        generateCommitment(messagesWithResponse);
         return;
       }
     } catch (error) {
@@ -324,9 +339,24 @@ export default function OnboardingPage() {
     try {
       const allMessages = messagesToUse || messages;
       const planAndAccountabilityMessages = allMessages.slice(planStartIndex);
+
+      // Calculate reading time for the last message
+      const lastMessage = allMessages[allMessages.length - 1];
+      const wordCount = lastMessage.content.split(/\s+/).length;
+      const wordsPerMinute = 200;
+      const readingTime = (wordCount / wordsPerMinute) * 60 * 1000;
+      const adjustedReadingTime = Math.min(
+        Math.max(readingTime * 1.2, 2000),
+        8000
+      );
+
+      console.log(`Reading time for last message: ${adjustedReadingTime}ms`);
       console.log(
         `Sending ${planAndAccountabilityMessages.length} messages to commitment`
       );
+
+      // Start timing and API call simultaneously
+      const startTime = Date.now();
 
       const response = await fetch(`${API_BASE}/chat/commitment`, {
         method: "POST",
@@ -370,18 +400,41 @@ export default function OnboardingPage() {
         setCommitmentData(commitmentDataFromAPI);
       }
 
-      setIsLoading(false);
-      // Small delay before showing commitment screen
+      // Calculate remaining reading time
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, adjustedReadingTime - elapsedTime);
+
+      console.log(
+        `API took ${elapsedTime}ms, waiting ${remainingTime}ms more for reading`
+      );
+
+      // Wait for remaining reading time before transition
       setTimeout(() => {
-        setPhase("commitment");
-      }, 500);
+        setIsLoading(false);
+        // Fade to black
+        setFadeIn(false);
+
+        setTimeout(() => {
+          setPhase("commitment");
+          // Fade in commitment screen
+          setTimeout(() => {
+            setFadeIn(true);
+          }, 100);
+        }, 500); // Wait for fade to black
+      }, remainingTime);
     } catch (error) {
       console.error("Error generating commitment:", error);
       setCommitmentText("Error generating commitment. Please try again.");
       setIsLoading(false);
       setTimeout(() => {
-        setPhase("commitment");
-      }, 500);
+        setFadeIn(false);
+        setTimeout(() => {
+          setPhase("commitment");
+          setTimeout(() => {
+            setFadeIn(true);
+          }, 100);
+        }, 500);
+      }, 2000);
     }
   };
 

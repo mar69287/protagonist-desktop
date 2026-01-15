@@ -1,7 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
+
+const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 interface CommitmentData {
   goal: string;
@@ -49,169 +52,117 @@ export default function CommitmentPhase({
   onSign,
   onBack,
 }: CommitmentPhaseProps) {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [showButton, setShowButton] = useState(false);
+  const [subPhase, setSubPhase] = useState(1);
+  const lottieRef = useRef<any>(null);
+  const [lottieDirection, setLottieDirection] = useState<1 | -1>(1);
+  const [animationData, setAnimationData] = useState<any>(null);
 
-  const slides = [
-    {
-      title: "Your Plan",
-      content: commitmentData.goal,
-    },
-    {
-      title: "Why It Matters",
-      content: commitmentData.why,
-    },
-    {
-      content: "But let's be real.",
-      delay: 2000,
-    },
-    {
-      content: "There will be days you don't want to do this.",
-      delay: 2000,
-    },
-    {
-      content: "These next 30 days aren't about motivation.",
-      delay: 2000,
-    },
-    {
-      content: "They're about commitment.",
-      delay: 2000,
-    },
-    {
-      content:
-        "When something is on the line, your brain stops negotiating with excuses. Action becomes automatic - regardless of how you feel.",
-      delay: 3000,
-    },
-    {
-      content:
-        "So here's how I'm going to keep you committed. You'll put some money down. Enough to care about losing it - not so much that it stresses you out.",
-      delay: 3000,
-    },
-    {
-      content: capitalizeFirstLetter(commitmentData.proofContextSentence),
-      delay: 2500,
-    },
-    {
-      content:
-        "And if life happens and you miss a day - keep going. As long as you hit 50%+ of the month — you'll get money back. And if you hit 90%+ — you'll get all of it back.",
-      delay: 3000,
-    },
-    {
-      content:
-        "Most people pursue their goals because they want to. Protagonists achieve them because they have to. They know this money isn't a penalty - it's a promise. A promise to yourself to stick to the long-term plan — even when short-term motivation fades.",
-      delay: 4000,
-    },
-    {
-      content: capitalizeFirstLetter(commitmentData.worthItSentence),
-      delay: 2500,
-    },
-  ];
+  // Load commitment animation
+  useEffect(() => {
+    fetch("/commitment.json")
+      .then((response) => response.json())
+      .then((data) => setAnimationData(data));
+  }, []);
+
+  // Yoyo effect for Lottie animation
+  const handleAnimationComplete = () => {
+    setLottieDirection((prev) => (prev === 1 ? -1 : 1));
+  };
 
   useEffect(() => {
-    if (currentSlide < slides.length) {
-      const delay = slides[currentSlide].delay || 3000;
-      const timer = setTimeout(() => {
-        if (currentSlide < slides.length - 1) {
-          setCurrentSlide(currentSlide + 1);
-        } else {
-          setShowButton(true);
-        }
-      }, delay);
-      return () => clearTimeout(timer);
+    if (lottieRef.current) {
+      lottieRef.current.setDirection(lottieDirection);
+      lottieRef.current.play();
     }
-  }, [currentSlide, slides.length]);
+  }, [lottieDirection]);
 
-  const currentSlideData = slides[currentSlide];
+  // SubPhase 1 animations - plan and why sections
+  const [planOpacity, setPlanOpacity] = useState(0);
+  const [whyOpacity, setWhyOpacity] = useState(0);
+
+  useEffect(() => {
+    if (subPhase === 1 && commitmentData.goal) {
+      // Plan section fade in
+      setTimeout(() => {
+        setPlanOpacity(1);
+      }, 500);
+
+      // Hold plan for 3 seconds
+      setTimeout(() => {
+        // Plan fade out
+        setPlanOpacity(0);
+
+        // Why section fade in
+        setTimeout(() => {
+          setWhyOpacity(1);
+          // Why section stays visible - no fade out, no button
+        }, 500);
+      }, 3500);
+    }
+  }, [subPhase, commitmentData.goal]);
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black">
-      {/* Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-gray-900 via-black to-gray-900" />
+    <div className="fixed inset-0 w-full h-screen bg-black overflow-hidden">
+      {/* Commitment Lottie Background */}
+      {animationData && (
+        <div className="fixed inset-0 z-0">
+          <Lottie
+            lottieRef={lottieRef}
+            animationData={animationData}
+            loop={false}
+            autoplay={true}
+            onComplete={handleAnimationComplete}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+            rendererSettings={{
+              preserveAspectRatio: "xMidYMid slice",
+            }}
+          />
+        </div>
+      )}
 
       {/* Content */}
       <motion.div
-        className="relative z-10 flex flex-col justify-between h-full p-8 pt-16"
+        className="relative z-10 w-full h-full flex flex-col"
         initial={{ opacity: 0 }}
         animate={{ opacity: fadeIn ? 1 : 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Messages */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="max-w-3xl mx-auto">
+        {subPhase === 1 && (
+          <div className="flex-1 flex items-start justify-start p-6 md:p-8 pt-16 md:pt-20">
+            {/* Plan section - fades in and out first */}
             <motion.div
-              key={currentSlide}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              className="absolute top-16 md:top-20 left-6 md:left-8 right-6 md:right-8 text-center"
+              animate={{ opacity: planOpacity }}
               transition={{ duration: 0.6 }}
             >
-              {currentSlideData.title && (
-                <h2 className="text-2xl md:text-3xl font-bold text-white text-center mb-4">
-                  {currentSlideData.title}
-                </h2>
-              )}
-              <p
-                className={`text-center ${
-                  currentSlideData.title
-                    ? "text-base md:text-lg text-gray-300"
-                    : "text-lg md:text-xl text-white"
-                } leading-relaxed`}
-                style={{ textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)" }}
-              >
-                {currentSlideData.content}
-              </p>
+              <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+                Your plan.
+              </h2>
+              <div>
+                <p className="text-base md:text-lg text-white leading-relaxed">
+                  {capitalizeFirstLetter(commitmentData.goal)}{" "}
+                  {commitmentData.actionSummary}
+                </p>
+              </div>
+            </motion.div>
+
+            {/* Why section - fades in after plan and stays visible */}
+            <motion.div
+              className="absolute top-16 md:top-20 left-6 md:left-8 right-6 md:right-8 text-center"
+              animate={{ opacity: whyOpacity }}
+              transition={{ duration: 0.6 }}
+            >
+              <div>
+                <p className="text-base md:text-lg text-white leading-relaxed">
+                  {capitalizeFirstLetter(commitmentData.coreReason)}
+                </p>
+              </div>
             </motion.div>
           </div>
-        </div>
-
-        {/* Button - Show after all slides */}
-        {showButton && (
-          <motion.div
-            className="flex flex-col items-center mb-8 space-y-4"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6 }}
-          >
-            {/* Timezone Selector */}
-            <div className="w-full max-w-md">
-              <label className="block text-sm text-gray-400 mb-2 text-center">
-                Select Your Timezone
-              </label>
-              <select
-                value={timezone}
-                onChange={(e) => onTimezoneChange(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-600 focus:outline-none focus:border-white transition-colors"
-              >
-                <option value="America/Los_Angeles">Pacific Time (PT)</option>
-                <option value="America/Denver">Mountain Time (MT)</option>
-                <option value="America/Chicago">Central Time (CT)</option>
-                <option value="America/New_York">Eastern Time (ET)</option>
-                <option value="America/Anchorage">Alaska Time (AKT)</option>
-                <option value="Pacific/Honolulu">Hawaii Time (HT)</option>
-                <option value="Europe/London">London (GMT)</option>
-                <option value="Europe/Paris">Paris (CET)</option>
-                <option value="Asia/Tokyo">Tokyo (JST)</option>
-                <option value="Australia/Sydney">Sydney (AEDT)</option>
-              </select>
-            </div>
-
-            {/* Sign Button */}
-            <button
-              onClick={onSign}
-              disabled={signed || isLoading}
-              className={`px-8 py-4 font-semibold rounded-xl text-lg transition-colors ${
-                signed || isLoading
-                  ? "bg-green-600 text-white cursor-not-allowed"
-                  : "bg-white text-black hover:bg-gray-100"
-              }`}
-            >
-              {signed ? "Signed ✓" : "Sign My Commitment"}
-            </button>
-
-            <p className="text-xs text-gray-400 text-center max-w-md px-4">
-              By signing, you agree to commit to your plan for the next 30 days.
-            </p>
-          </motion.div>
         )}
       </motion.div>
     </div>

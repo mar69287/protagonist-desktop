@@ -29,12 +29,12 @@ export default function ChatBackground({ style }: ChatBackgroundProps) {
   }, []);
 
   const handleInitialAnimationFinish = () => {
-    console.log("Initial animation finished, switching to loop animation");
+    // console.log("Initial animation finished, switching to loop animation");
     setShowLoopAnimation(true);
   };
 
   const handleLoopAnimationFinish = () => {
-    console.log("Loop animation finished, reversing direction");
+    // console.log("Loop animation finished, reversing direction");
     setLottieDirection((prev) => (prev === 1 ? -1 : 1));
   };
 
@@ -48,10 +48,7 @@ export default function ChatBackground({ style }: ChatBackgroundProps) {
   }, [lottieDirection, showLoopAnimation]);
 
   return (
-    <div
-      className="absolute inset-0 pointer-events-none"
-      style={style}
-    >
+    <div className="absolute inset-0 pointer-events-none" style={style}>
       {/* Initial Animation */}
       {initialAnimationData && (
         <div

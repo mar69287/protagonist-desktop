@@ -122,15 +122,15 @@ export default function SequentialTextDisplay({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: fadeDuration }}
-        className="w-full"
+        className="w-full break-words"
       >
         <div
           ref={scrollViewRef}
-          className="overflow-y-auto"
+          className="overflow-y-auto break-words"
           style={{ maxHeight: maxScrollHeight }}
         >
           {sections.map((section, index) => (
-            <div key={index} className="mb-4 last:mb-0">
+            <div key={index} className="mb-4 last:mb-0 break-words">
               {renderFormattedText ? (
                 renderFormattedText(section)
               ) : (
@@ -145,7 +145,7 @@ export default function SequentialTextDisplay({
 
   // Show current section with fade animation
   return (
-    <div className="w-full">
+    <div className="w-full break-words">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentSectionIndex}
@@ -153,6 +153,7 @@ export default function SequentialTextDisplay({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: fadeDuration }}
+          className="break-words"
         >
           {renderFormattedText ? (
             renderFormattedText(sections[currentSectionIndex])

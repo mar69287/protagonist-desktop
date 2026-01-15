@@ -101,26 +101,36 @@ export default function ChatPhase({
   const renderFormattedText = (text: string) => {
     if (!text || typeof text !== "string") return <span>{text}</span>;
 
-    // Split by **bold** and *italic* patterns
-    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    // Split by line breaks first to preserve them
+    const lines = text.split("\n");
 
     return (
       <>
-        {parts.map((part, index) => {
-          if (part.startsWith("**") && part.endsWith("**")) {
-            return (
-              <strong key={index} className="font-bold">
-                {part.slice(2, -2)}
-              </strong>
-            );
-          } else if (part.startsWith("*") && part.endsWith("*")) {
-            return (
-              <em key={index} className="italic">
-                {part.slice(1, -1)}
-              </em>
-            );
-          }
-          return <span key={index}>{part}</span>;
+        {lines.map((line, lineIndex) => {
+          // Split by **bold** and *italic* patterns
+          const parts = line.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+
+          return (
+            <span key={lineIndex}>
+              {parts.map((part, index) => {
+                if (part.startsWith("**") && part.endsWith("**")) {
+                  return (
+                    <strong key={index} className="font-bold">
+                      {part.slice(2, -2)}
+                    </strong>
+                  );
+                } else if (part.startsWith("*") && part.endsWith("*")) {
+                  return (
+                    <em key={index} className="italic">
+                      {part.slice(1, -1)}
+                    </em>
+                  );
+                }
+                return <span key={index}>{part}</span>;
+              })}
+              {lineIndex < lines.length - 1 && <br />}
+            </span>
+          );
         })}
       </>
     );
@@ -166,22 +176,23 @@ export default function ChatPhase({
                   }}
                 >
                   <div
-                    className={`w-full transition-opacity duration-300 ${
+                    className={`w-full transition-opacity duration-300 break-words ${
                       currentIndex === index ? "opacity-100" : "opacity-0"
                     }`}
+                    style={{ overflowWrap: "anywhere" }}
                   >
                     {message.role === "assistant" &&
                     index === assistantMessages.length - 1 ? (
                       // Apply sequential display to the most recent assistant message
                       <SequentialTextDisplay
                         text={message.content}
-                        className="text-base md:text-lg text-gray-300 leading-relaxed text-left"
+                        className="text-base md:text-lg text-gray-300 leading-relaxed text-left break-words"
                         minDuration={2000}
                         maxDuration={8000}
                         wordsPerMinute={200}
                         fadeDuration={0.4}
                         renderFormattedText={(text) => (
-                          <p className="text-base md:text-lg text-gray-300 leading-relaxed text-left">
+                          <p className="text-base md:text-lg text-gray-300 leading-relaxed text-left break-words">
                             {renderFormattedText(text)}
                           </p>
                         )}
@@ -189,7 +200,7 @@ export default function ChatPhase({
                       />
                     ) : (
                       // Show older messages normally
-                      <p className="text-base md:text-lg text-gray-300 leading-relaxed text-left">
+                      <p className="text-base md:text-lg text-gray-300 leading-relaxed text-left break-words">
                         {renderFormattedText(message.content)}
                       </p>
                     )}
