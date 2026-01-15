@@ -69,26 +69,26 @@ export default function IntroScreen({ fadeIn, onStart }: IntroScreenProps) {
 
   const messages1 = [
     "Welcome to the first day of the rest of your life.",
-    // "You're about to take the first step toward becoming the protagonist of your own story.",
-    // "Don't worry — you won't be doing this alone.",
-    // "I'll be with you the whole way.",
-    // "Before we begin, you need to know where you're going.",
-    // "Whether you arrived here crystal-clear or completely lost, you're about to answer the questions most people avoid — and gain the clarity most people never reach.",
-    // "It takes about 2 minutes.",
-    // "After that, your story begins.",
-    // "There's only one wrong way to do this:",
-    // "by not being honest.",
-    // "So… be honest.",
-    // "Ready?",
+    "You're about to take the first step toward becoming the protagonist of your own story.",
+    "Don't worry — you won't be doing this alone.",
+    "I'll be with you the whole way.",
+    "Before we begin, you need to know where you're going.",
+    "Whether you arrived here crystal-clear or completely lost, you're about to answer the questions most people avoid — and gain the clarity most people never reach.",
+    "It takes about 2 minutes.",
+    "After that, your story begins.",
+    "There's only one wrong way to do this:",
+    "by not being honest.",
+    "So… be honest.",
+    "Ready?",
   ];
 
   const messages2 = [
     "Reality Check",
-    // "This is the Reality Check.",
-    // "An honest scan of your life as it is now — so we know how to take it where you want it to go.",
-    // "You'll be scoring each area of your life, one by one — from your family to your finances. Trust your gut.",
-    // "When the countdown hits zero, press and hold the center of the screen.",
-    // "The better you feel about the area, the longer you should hold.",
+    "This is the Reality Check.",
+    "An honest scan of your life as it is now — so we know how to take it where you want it to go.",
+    "You'll be scoring each area of your life, one by one — from your family to your finances. Trust your gut.",
+    "When the countdown hits zero, press and hold the center of the screen.",
+    "The better you feel about the area, the longer you should hold.",
   ];
 
   const currentMessages = currentScreen === 0 ? messages1 : messages2;
