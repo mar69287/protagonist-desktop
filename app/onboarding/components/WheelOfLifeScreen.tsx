@@ -419,7 +419,7 @@ export default function WheelOfLifeScreen({
         </button>
 
         {/* Area Label */}
-        <div className="flex items-center justify-center mt-16 mb-8">
+        <div className="flex items-center justify-center mt-10 mb-8">
           <h1
             className="text-4xl md:text-5xl font-bold text-white text-center z-20"
             style={{
