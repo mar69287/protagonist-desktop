@@ -238,7 +238,7 @@ export default function IntroScreen({ fadeIn, onStart }: IntroScreenProps) {
       {/* Lottie Background */}
       {currentAnim && (
         <motion.div
-          className="absolute -top-5 left-0 right-0 bottom-0"
+          className="absolute -top-10 left-0 right-0 bottom-0"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1.5 }}
@@ -253,7 +253,7 @@ export default function IntroScreen({ fadeIn, onStart }: IntroScreenProps) {
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              transform: "translateY(20px)",
+              transform: "translateY(40px)",
             }}
             rendererSettings={{
               preserveAspectRatio: "xMidYMid slice",
