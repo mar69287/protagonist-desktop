@@ -100,82 +100,81 @@ export default function OnboardingPage() {
     console.log(JSON.stringify(wheelData, null, 2));
 
     setWheelData(wheelData);
-
-    // Fade to black before transitioning
+    
+    // WheelOfLifeScreen already faded to black, ensure fadeIn is false for chat phase
     setFadeIn(false);
+    
+    // Transition to chat
+    setPhase("plan");
+    setMessages([]);
+
+    // Fade in the chat screen from black
+    setTimeout(() => {
+      setFadeIn(true);
+    }, 100);
+
+    // Show loading dots for 3 seconds
+    setIsLoading(true);
 
     setTimeout(() => {
-      setPhase("plan");
-      setMessages([]);
+      // After 3 seconds, hide loading and show "Got It." message
+      setIsLoading(false);
 
-      // Fade in after phase change
-      setTimeout(() => {
-        setFadeIn(true);
-      }, 100);
+      const initialUserMessage: Message = {
+        role: "user",
+        content: "Got It.",
+      };
+      setMessages([initialUserMessage]);
 
-      // Show loading dots for 3 seconds
-      setIsLoading(true);
+      // Wait another 3 seconds before calling API
+      setTimeout(async () => {
+        setIsLoading(true);
 
-      setTimeout(() => {
-        // After 3 seconds, hide loading and show "Got It." message
-        setIsLoading(false);
+        try {
+          const payload = {
+            messages: [],
+            wheel_data: { areas: wheelData },
+          };
 
-        const initialUserMessage: Message = {
-          role: "user",
-          content: "Got It.",
-        };
-        setMessages([initialUserMessage]);
+          console.log("=== Sending Wheel Data to AI API (/chat/plan) ===");
+          console.log(JSON.stringify(payload, null, 2));
 
-        // Wait another 3 seconds before calling API
-        setTimeout(async () => {
-          setIsLoading(true);
+          const response = await fetch(`${API_BASE}/chat/plan`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
 
-          try {
-            const payload = {
-              messages: [],
-              wheel_data: { areas: wheelData },
-            };
+          if (!response.ok) throw new Error(`API error: ${response.status}`);
 
-            console.log("=== Sending Wheel Data to AI API (/chat/plan) ===");
-            console.log(JSON.stringify(payload, null, 2));
+          const data = await response.json();
+          const aiMessage: Message = {
+            role: "assistant",
+            content:
+              data.message ||
+              data.response ||
+              "Let's create a plan based on your wheel of life assessment.",
+          };
 
-            const response = await fetch(`${API_BASE}/chat/plan`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
+          console.log("=== AI RESPONSE (Plan Initial) ===");
+          console.log(aiMessage.content);
 
-            if (!response.ok) throw new Error(`API error: ${response.status}`);
-
-            const data = await response.json();
-            const aiMessage: Message = {
-              role: "assistant",
-              content:
-                data.message ||
-                data.response ||
-                "Let's create a plan based on your wheel of life assessment.",
-            };
-
-            console.log("=== AI RESPONSE (Plan Initial) ===");
-            console.log(aiMessage.content);
-
-            setMessages((prev) => [...prev, aiMessage]);
-            setPlanStartIndex(0);
-            setIsLoading(false);
-          } catch (error) {
-            console.error("Error fetching initial plan message:", error);
-            const fallbackMessage: Message = {
-              role: "assistant",
-              content:
-                "Great! Now let's create a plan based on your wheel of life assessment. What area would you like to focus on improving?",
-            };
-            setMessages((prev) => [...prev, fallbackMessage]);
-            setPlanStartIndex(0);
-            setIsLoading(false);
-          }
-        }, 3000);
+          setMessages((prev) => [...prev, aiMessage]);
+          setPlanStartIndex(0);
+          setIsLoading(false);
+        } catch (error) {
+          console.error("Error fetching initial plan message:", error);
+          const fallbackMessage: Message = {
+            role: "assistant",
+            content:
+              "Great! Now let's create a plan based on your wheel of life assessment. What area would you like to focus on improving?",
+          };
+          setMessages((prev) => [...prev, fallbackMessage]);
+          setPlanStartIndex(0);
+          setIsLoading(false);
+        }
       }, 3000);
-    }, 500); // Wait for fade to black
+    }, 3000);
   };
 
   // ==================== PLAN PHASE ====================

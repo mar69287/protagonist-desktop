@@ -305,7 +305,26 @@ export default function WheelOfLifeScreen({
     console.log("=== Wheel of Life Data ===");
     console.log(JSON.stringify(wheelData, null, 2));
 
-    onComplete(wheelData);
+    // Fade to black before completing
+    const overlay = document.createElement("div");
+    overlay.style.cssText =
+      "position: fixed; inset: 0; background: black; z-index: 9999; opacity: 0; transition: opacity 0.5s ease-in-out;";
+    document.body.appendChild(overlay);
+
+    setTimeout(() => {
+      overlay.style.opacity = "1";
+    }, 10);
+
+    setTimeout(() => {
+      onComplete(wheelData);
+      // Keep the overlay for a moment while chat phase fades in, then remove it
+      setTimeout(() => {
+        overlay.style.opacity = "0";
+        setTimeout(() => {
+          document.body.removeChild(overlay);
+        }, 500);
+      }, 100);
+    }, 500);
   };
 
   const allValuesSet = WHEEL_AREAS.every((area) => values[area] !== undefined);
