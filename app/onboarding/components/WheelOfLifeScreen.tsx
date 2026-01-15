@@ -481,7 +481,7 @@ export default function WheelOfLifeScreen({
               )}
 
               {/* Measurements Sidebar */}
-              <div className="absolute right-4 md:right-8 flex flex-col gap-4 md:gap-6 text-right z-15 pointer-events-none">
+              <div className="absolute right-4 md:right-8 flex flex-col gap-16 md:gap-24 text-right z-15 pointer-events-none">
                 {MEASUREMENTS.map((measurement) => {
                   const isActive =
                     displayPercentage >= measurement.min &&
