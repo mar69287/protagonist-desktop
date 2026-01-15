@@ -59,6 +59,7 @@ export default function Home() {
           <h1
             className="text-2xl md:text-5xl font-extrabold text-white tracking-[0.125em]"
             style={{
+              fontFamily: "'Ogg', serif",
               textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
             }}
           >
@@ -89,6 +90,7 @@ export default function Home() {
             }}
             className="px-4 py-2 text-white text-xl md:text-2xl font-semibold cursor-pointer"
             style={{
+              fontFamily: "'Helvetica Neue', system-ui, sans-serif",
               textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
             }}
             whileHover={{ scale: 1.05 }}
@@ -101,6 +103,7 @@ export default function Home() {
             <motion.button
               className="px-4 py-2 text-white text-xl md:text-2xl font-semibold"
               style={{
+                fontFamily: "'Helvetica Neue', system-ui, sans-serif",
                 textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
               }}
               whileHover={{ scale: 1.05 }}

@@ -139,11 +139,21 @@ export default function CommitmentPhase({
               animate={{ opacity: planOpacity }}
               transition={{ duration: 0.6 }}
             >
-              <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+              <h2
+                className="text-2xl md:text-3xl font-bold text-white mb-6"
+                style={{
+                  fontFamily: "'Helvetica Neue', system-ui, sans-serif",
+                }}
+              >
                 Your plan.
               </h2>
               <div>
-                <p className="text-base md:text-lg text-white leading-relaxed">
+                <p
+                  className="text-base md:text-lg text-white leading-relaxed"
+                  style={{
+                    fontFamily: "'Helvetica Neue', system-ui, sans-serif",
+                  }}
+                >
                   {capitalizeFirstLetter(commitmentData.goal)}{" "}
                   {commitmentData.actionSummary}
                 </p>
@@ -157,7 +167,12 @@ export default function CommitmentPhase({
               transition={{ duration: 0.6 }}
             >
               <div>
-                <p className="text-base md:text-lg text-white leading-relaxed">
+                <p
+                  className="text-base md:text-lg text-white leading-relaxed"
+                  style={{
+                    fontFamily: "'Helvetica Neue', system-ui, sans-serif",
+                  }}
+                >
                   {capitalizeFirstLetter(commitmentData.coreReason)}
                 </p>
               </div>

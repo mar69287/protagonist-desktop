@@ -297,6 +297,7 @@ export default function IntroScreen({ fadeIn, onStart }: IntroScreenProps) {
                   currentMessages[currentMessageIndex]
                 )} max-w-3xl`}
                 style={{
+                  fontFamily: "'Helvetica Neue', system-ui, sans-serif",
                   textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
                 }}
                 initial={{ opacity: 0 }}
@@ -341,6 +342,7 @@ export default function IntroScreen({ fadeIn, onStart }: IntroScreenProps) {
                         message
                       )} max-w-3xl`}
                       style={{
+                        fontFamily: "'Helvetica Neue', system-ui, sans-serif",
                         textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
                       }}
                     >
@@ -365,6 +367,7 @@ export default function IntroScreen({ fadeIn, onStart }: IntroScreenProps) {
               onClick={handleNext}
               className="w-full max-w-[600px] px-8 py-[18px] text-white font-semibold rounded-2xl transition-all hover:scale-105 active:scale-95 text-lg"
               style={{
+                fontFamily: "'Helvetica Neue', system-ui, sans-serif",
                 background:
                   "linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%)",
                 border: "1px solid rgba(255, 255, 255, 0.2)",

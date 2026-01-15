@@ -403,7 +403,10 @@ export default function WheelOfLifeScreen({
         <div className="flex items-center justify-center mt-16 mb-8">
           <h1
             className="text-4xl md:text-5xl font-bold text-white text-center z-20"
-            style={{ textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)" }}
+            style={{
+              fontFamily: "'Helvetica Neue', system-ui, sans-serif",
+              textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
+            }}
           >
             {currentArea}
           </h1>
@@ -414,7 +417,10 @@ export default function WheelOfLifeScreen({
           {countdown !== null && countdown > 0 && (
             <motion.div
               className="text-8xl md:text-9xl font-bold text-white"
-              style={{ textShadow: "0px 4px 16px rgba(0, 0, 0, 0.9)" }}
+              style={{
+                fontFamily: "'Helvetica Neue', system-ui, sans-serif",
+                textShadow: "0px 4px 16px rgba(0, 0, 0, 0.9)",
+              }}
               initial={{ scale: 1.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.5, opacity: 0 }}
@@ -445,7 +451,10 @@ export default function WheelOfLifeScreen({
                 <div className="absolute left-8 md:left-16 z-15 w-36 h-36 md:w-44 md:h-44 rounded-full border-2 border-blue-400 bg-blue-400/20 flex items-center justify-center pointer-events-none">
                   <p
                     className="text-white text-base md:text-lg font-semibold"
-                    style={{ textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)" }}
+                    style={{
+                      fontFamily: "'Helvetica Neue', system-ui, sans-serif",
+                      textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
+                    }}
                   >
                     Press & Hold
                   </p>
