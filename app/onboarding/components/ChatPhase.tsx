@@ -38,11 +38,12 @@ export default function ChatPhase({
 
   // Get the latest assistant message
   const assistantMessages = messages.filter((msg) => msg.role === "assistant");
-  const latestAssistantMessage = assistantMessages[assistantMessages.length - 1];
-  
+  const latestAssistantMessage =
+    assistantMessages[assistantMessages.length - 1];
+
   // Get the "Got It." message if it exists
   const gotItMessage = messages.find((msg) => msg.content === "Got It.");
-  
+
   // Show "Got It." if no assistant messages yet, otherwise show latest assistant message
   const displayMessage = latestAssistantMessage || gotItMessage;
 
@@ -124,7 +125,7 @@ export default function ChatPhase({
                         {renderFormattedText(text)}
                       </p>
                     )}
-                    maxScrollHeight="60vh"
+                    maxScrollHeight="25vh"
                   />
                 </div>
               ) : (

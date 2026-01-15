@@ -126,8 +126,11 @@ export default function SequentialTextDisplay({
       >
         <div
           ref={scrollViewRef}
-          className="overflow-y-auto break-words"
-          style={{ maxHeight: maxScrollHeight }}
+          className="overflow-y-auto break-words scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent"
+          style={{ 
+            maxHeight: maxScrollHeight,
+            WebkitOverflowScrolling: "touch"
+          }}
         >
           {sections.map((section, index) => (
             <div key={index} className="mb-4 last:mb-0 break-words">

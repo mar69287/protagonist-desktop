@@ -79,6 +79,7 @@ export default function CommitmentPhase({
   // SubPhase 1 animations - plan and why sections
   const [planOpacity, setPlanOpacity] = useState(0);
   const [whyOpacity, setWhyOpacity] = useState(0);
+  const [waitlistOpacity, setWaitlistOpacity] = useState(0);
 
   useEffect(() => {
     if (subPhase === 1 && commitmentData.goal) {
@@ -95,7 +96,16 @@ export default function CommitmentPhase({
         // Why section fade in
         setTimeout(() => {
           setWhyOpacity(1);
-          // Why section stays visible - no fade out, no button
+          // After why section is visible for 4 seconds, transition to waitlist
+          setTimeout(() => {
+            setWhyOpacity(0);
+            setTimeout(() => {
+              setSubPhase(2);
+              setTimeout(() => {
+                setWaitlistOpacity(1);
+              }, 500);
+            }, 600);
+          }, 4000);
         }, 500);
       }, 3500);
     }
@@ -176,6 +186,51 @@ export default function CommitmentPhase({
                   {capitalizeFirstLetter(commitmentData.coreReason)}
                 </p>
               </div>
+            </motion.div>
+          </div>
+        )}
+
+        {subPhase === 2 && (
+          <div className="flex-1 flex items-start justify-center p-6 md:p-8 pt-16 md:pt-20">
+            <motion.div
+              className="text-center max-w-2xl"
+              animate={{ opacity: waitlistOpacity }}
+              transition={{ duration: 0.6 }}
+            >
+              <p
+                className="text-xl md:text-2xl text-white leading-relaxed mb-6"
+                style={{
+                  fontFamily: "'Helvetica Neue', system-ui, sans-serif",
+                  textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
+                }}
+              >
+                Want help making it happen? I'll track your progress and pay you
+                every day that you upload proof.
+              </p>
+              <p
+                className="text-base md:text-lg text-white mb-4"
+                style={{
+                  fontFamily: "'Helvetica Neue', system-ui, sans-serif",
+                  textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
+                }}
+              >
+                Just join the protagonist waitlist here:
+              </p>
+              <a
+                href="https://waitlist.betheprotagonist.co/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-8 py-4 text-white font-semibold rounded-2xl transition-all hover:scale-105 active:scale-95 text-lg"
+                style={{
+                  fontFamily: "'Helvetica Neue', system-ui, sans-serif",
+                  background:
+                    "linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  textShadow: "0px 2px 8px rgba(0, 0, 0, 0.8)",
+                }}
+              >
+                Join Waitlist
+              </a>
             </motion.div>
           </div>
         )}
