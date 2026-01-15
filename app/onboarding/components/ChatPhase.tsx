@@ -253,8 +253,14 @@ export default function ChatPhase({
         </div>
 
         {/* Input Area */}
-        <div className="absolute bottom-0 left-0 right-0 z-20">
-          <div className="p-6">
+        <div
+          className="absolute bottom-0 left-0 right-0 z-20 pb-20"
+          style={{
+            background:
+              "linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.8) 70%, transparent 100%)",
+          }}
+        >
+          <div className="px-6 pt-12 pb-6">
             <form
               onSubmit={handleSubmit}
               className="flex flex-row items-end gap-2 bg-transparent rounded-[22px] p-1.5"
@@ -269,6 +275,15 @@ export default function ChatPhase({
                       onSend();
                     }
                   }
+                }}
+                onFocus={(e) => {
+                  // Scroll the input into view on iOS
+                  setTimeout(() => {
+                    e.target.scrollIntoView({
+                      behavior: "smooth",
+                      block: "center",
+                    });
+                  }, 300);
                 }}
                 placeholder="Share what's on your mind..."
                 disabled={isLoading}
