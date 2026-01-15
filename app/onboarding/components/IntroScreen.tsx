@@ -358,7 +358,7 @@ export default function IntroScreen({ fadeIn, onStart }: IntroScreenProps) {
         {/* Button */}
         {showScrollWheel && (
           <motion.div
-            className="absolute bottom-12 left-0 right-0 flex justify-center z-30 px-8"
+            className="absolute bottom-20 left-0 right-0 flex justify-center z-30 px-8"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6 }}
