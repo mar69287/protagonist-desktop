@@ -1,7 +1,7 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { useEffect } from "react";
 import ChatBackground from "./ChatBackground";
 import SequentialTextDisplay from "./SequentialTextDisplay";
 
@@ -31,65 +31,20 @@ export default function ChatPhase({
   onSend,
   onBack,
 }: ChatPhaseProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
-
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollTo({ top: 0, behavior: "instant" });
-    }
   }, []);
 
-  // Filter to only show assistant messages and the initial "Got It." user message
-  const assistantMessages = messages.filter(
-    (msg) => msg.role === "assistant" || msg.content === "Got It."
-  );
-
-  // Calculate item height based on viewport
-  const ITEM_HEIGHT_VH = 60; // 60% of viewport height
-
-  // Auto-scroll to latest message when new messages arrive
-  useEffect(() => {
-    if (assistantMessages.length > 0) {
-      const timer = setTimeout(() => {
-        const lastIndex = assistantMessages.length - 1;
-        if (messagesEndRef.current) {
-          messagesEndRef.current.scrollTo({
-            top: lastIndex * (window.innerHeight * (ITEM_HEIGHT_VH / 100)),
-            behavior: "smooth",
-          });
-        }
-        setCurrentIndex(lastIndex);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [assistantMessages.length]);
-
-  // Scroll to loading indicator when loading starts
-  useEffect(() => {
-    if (isLoading && assistantMessages.length > 0) {
-      const timer = setTimeout(() => {
-        if (messagesEndRef.current) {
-          messagesEndRef.current.scrollTo({
-            top:
-              assistantMessages.length *
-              (window.innerHeight * (ITEM_HEIGHT_VH / 100)),
-            behavior: "smooth",
-          });
-        }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading, assistantMessages.length]);
-
-  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
-    const scrollTop = event.currentTarget.scrollTop;
-    const itemHeight = window.innerHeight * (ITEM_HEIGHT_VH / 100);
-    const index = Math.round(scrollTop / itemHeight);
-    setCurrentIndex(Math.max(0, Math.min(index, assistantMessages.length - 1)));
-  };
+  // Get the latest assistant message
+  const assistantMessages = messages.filter((msg) => msg.role === "assistant");
+  const latestAssistantMessage = assistantMessages[assistantMessages.length - 1];
+  
+  // Get the "Got It." message if it exists
+  const gotItMessage = messages.find((msg) => msg.content === "Got It.");
+  
+  // Show "Got It." if no assistant messages yet, otherwise show latest assistant message
+  const displayMessage = latestAssistantMessage || gotItMessage;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,107 +103,72 @@ export default function ChatPhase({
         animate={{ opacity: fadeIn ? 1 : 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Messages - Scroll Wheel */}
-        <div className="absolute inset-0">
-          <div
-            ref={messagesEndRef}
-            className="w-full h-full overflow-y-auto scroll-smooth"
-            style={{
-              scrollSnapType: "y mandatory",
-              WebkitOverflowScrolling: "touch",
-            }}
-            onScroll={handleScroll}
-          >
-            <div
-              className="px-6 md:px-8"
-              style={{
-                paddingTop: "5rem",
-                paddingBottom: `${40}vh`,
-              }}
-            >
-              {assistantMessages.map((message, index) => (
+        {/* Messages - Only Latest */}
+        <div className="absolute inset-0 flex items-start justify-center pt-4 pb-40 px-6 md:px-8">
+          <div className="w-full max-w-3xl">
+            {displayMessage ? (
+              displayMessage.role === "assistant" ? (
                 <div
-                  key={index}
-                  className="flex items-start pt-8"
-                  style={{
-                    minHeight: `${ITEM_HEIGHT_VH}vh`,
-                    scrollSnapAlign: "start",
-                  }}
+                  className="w-full break-words"
+                  style={{ overflowWrap: "anywhere" }}
                 >
-                  <div
-                    className={`w-full transition-opacity duration-300 break-words ${
-                      currentIndex === index ? "opacity-100" : "opacity-0"
-                    }`}
-                    style={{ overflowWrap: "anywhere" }}
-                  >
-                    {message.role === "assistant" &&
-                    index === assistantMessages.length - 1 ? (
-                      // Apply sequential display to the most recent assistant message
-                      <SequentialTextDisplay
-                        text={message.content}
-                        className="text-base md:text-lg text-gray-300 leading-relaxed text-left break-words"
-                        minDuration={2000}
-                        maxDuration={8000}
-                        wordsPerMinute={200}
-                        fadeDuration={0.4}
-                        renderFormattedText={(text) => (
-                          <p className="text-base md:text-lg text-gray-300 leading-relaxed text-left break-words">
-                            {renderFormattedText(text)}
-                          </p>
-                        )}
-                        maxScrollHeight="15vh"
-                      />
-                    ) : (
-                      // Show older messages normally
+                  <SequentialTextDisplay
+                    text={displayMessage.content}
+                    className="text-base md:text-lg text-gray-300 leading-relaxed text-left break-words"
+                    minDuration={2000}
+                    maxDuration={8000}
+                    wordsPerMinute={200}
+                    fadeDuration={0.4}
+                    renderFormattedText={(text) => (
                       <p className="text-base md:text-lg text-gray-300 leading-relaxed text-left break-words">
-                        {renderFormattedText(message.content)}
+                        {renderFormattedText(text)}
                       </p>
                     )}
-                  </div>
+                    maxScrollHeight="60vh"
+                  />
                 </div>
-              ))}
+              ) : (
+                // Show "Got It." message
+                <p className="text-base md:text-lg text-gray-300 leading-relaxed text-left break-words">
+                  {displayMessage.content}
+                </p>
+              )
+            ) : null}
 
-              {/* Loading Indicator */}
-              {isLoading && (
-                <div
-                  className="flex items-start pt-8"
-                  style={{
-                    height: `${ITEM_HEIGHT_VH}vh`,
-                    scrollSnapAlign: "start",
-                  }}
-                >
-                  <div className="flex gap-2">
-                    <motion.div
-                      className="w-2 h-2 bg-gray-400 rounded-full"
-                      animate={{ y: [0, -8, 0] }}
-                      transition={{
-                        duration: 0.6,
-                        repeat: Infinity,
-                        delay: 0,
-                      }}
-                    />
-                    <motion.div
-                      className="w-2 h-2 bg-gray-400 rounded-full"
-                      animate={{ y: [0, -8, 0] }}
-                      transition={{
-                        duration: 0.6,
-                        repeat: Infinity,
-                        delay: 0.15,
-                      }}
-                    />
-                    <motion.div
-                      className="w-2 h-2 bg-gray-400 rounded-full"
-                      animate={{ y: [0, -8, 0] }}
-                      transition={{
-                        duration: 0.6,
-                        repeat: Infinity,
-                        delay: 0.3,
-                      }}
-                    />
-                  </div>
+            {/* Loading Indicator */}
+            {isLoading && (
+              <div className="flex items-start pt-4">
+                <div className="flex gap-2">
+                  <motion.div
+                    className="w-2 h-2 bg-gray-400 rounded-full"
+                    animate={{ y: [0, -8, 0] }}
+                    transition={{
+                      duration: 0.6,
+                      repeat: Infinity,
+                      delay: 0,
+                    }}
+                  />
+                  <motion.div
+                    className="w-2 h-2 bg-gray-400 rounded-full"
+                    animate={{ y: [0, -8, 0] }}
+                    transition={{
+                      duration: 0.6,
+                      repeat: Infinity,
+                      delay: 0.15,
+                    }}
+                  />
+                  <motion.div
+                    className="w-2 h-2 bg-gray-400 rounded-full"
+                    animate={{ y: [0, -8, 0] }}
+                    transition={{
+                      duration: 0.6,
+                      repeat: Infinity,
+                      delay: 0.3,
+                    }}
+                  />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
