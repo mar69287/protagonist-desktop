@@ -368,13 +368,14 @@ export async function POST(request: NextRequest) {
  * Note: "denied" submissions count as expected but NOT successful
  *
  * First Billing Cycle:
- * - 90%+ completion: Full refund ($98)
- * - 70-90% completion: $50 refund
- * - <70%: No refund
+ * - 90%+ completion: $98 refund
+ * - 70-89% completion: $49 refund
+ * - 50-69% completion: $30 refund
+ * - <50%: No refund
  *
  * Subsequent Billing Cycles:
  * - 90%+ completion: $50 refund
- * - 70-90% completion: $25 refund
+ * - 70-89% completion: $25 refund
  * - <70%: No refund
  */
 function calculateRefundFromSubmissions(
@@ -401,9 +402,11 @@ function calculateRefundFromSubmissions(
   if (isFirstBillingCycle) {
     // First billing cycle refund logic
     if (completionRate >= 90) {
-      refundAmount = 98; // Full refund
+      refundAmount = 98;
     } else if (completionRate >= 70) {
-      refundAmount = 50;
+      refundAmount = 49;
+    } else if (completionRate >= 50) {
+      refundAmount = 30;
     } else {
       refundAmount = 0; // No refund
     }
