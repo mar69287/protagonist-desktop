@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingUp, DollarSign, Target } from "lucide-react";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { User } from "@/types";
@@ -16,6 +16,89 @@ const CheckoutForm = dynamic(() => import("@/services/stripe/CheckoutForm"), {
     </div>
   ),
 });
+
+// Neumorphic Card Component with Inset Shadow Effect
+interface NeumorphicCardProps {
+  children: ReactNode;
+  className?: string;
+  centerContent?: boolean;
+}
+
+function NeumorphicCard({
+  children,
+  className = "",
+  centerContent = false,
+}: NeumorphicCardProps) {
+  return (
+    <div
+      className={`relative overflow-hidden ${className}`}
+      style={{
+        backgroundColor: "#1a1a1a",
+        border: "1px solid rgba(255, 255, 255, 0.08)",
+        borderRadius: "24px",
+        padding: "32px",
+      }}
+    >
+      {/* Top inner shadow */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "40%",
+          background:
+            "linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0.4), rgba(0,0,0,0.25), rgba(0,0,0,0.12), rgba(0,0,0,0.05), transparent)",
+          borderRadius: "24px 24px 0 0",
+          pointerEvents: "none",
+          zIndex: 1,
+        }}
+      />
+
+      {/* Left inner shadow */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: "35%",
+          background:
+            "linear-gradient(to right, rgba(0,0,0,0.5), rgba(0,0,0,0.3), rgba(0,0,0,0.15), rgba(0,0,0,0.08), rgba(0,0,0,0.03), transparent)",
+          borderRadius: "24px 0 0 24px",
+          pointerEvents: "none",
+          zIndex: 1,
+        }}
+      />
+
+      {/* Right inner shadow */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: "35%",
+          background:
+            "linear-gradient(to left, rgba(0,0,0,0.5), rgba(0,0,0,0.3), rgba(0,0,0,0.15), rgba(0,0,0,0.08), rgba(0,0,0,0.03), transparent)",
+          borderRadius: "0 24px 24px 0",
+          pointerEvents: "none",
+          zIndex: 1,
+        }}
+      />
+
+      {/* Content */}
+      <div
+        className={
+          centerContent ? "flex flex-col items-center justify-center" : ""
+        }
+        style={{ position: "relative", zIndex: 2 }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 // Component that uses searchParams
 function SignupContent() {
@@ -84,10 +167,21 @@ function SignupContent() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="fixed top-24 sm:top-28 right-4 sm:right-8 z-50 glass-light rounded-full px-4 py-2 flex items-center gap-2 shadow-lg"
+              className="fixed top-24 sm:top-28 right-4 sm:right-8 z-50 rounded-full px-4 py-2 flex items-center gap-2 shadow-lg"
+              style={{
+                backgroundColor: "#1a1a1a",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+              }}
             >
-              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-              <span className="text-white text-sm hidden sm:inline">
+              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-[#888888]"></div>
+              <span
+                className="text-sm hidden sm:inline"
+                style={{
+                  color: "#b0b0b0",
+                  fontFamily:
+                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                }}
+              >
                 Loading...
               </span>
             </motion.div>
@@ -98,9 +192,22 @@ function SignupContent() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="fixed top-24 sm:top-28 left-1/2 transform -translate-x-1/2 z-50 glass-light rounded-xl px-4 py-3 border-2 border-red-500/30 shadow-lg max-w-md"
+              className="fixed top-24 sm:top-28 left-1/2 transform -translate-x-1/2 z-50 rounded-xl px-4 py-3 shadow-lg max-w-md"
+              style={{
+                backgroundColor: "#1a1a1a",
+                border: "2px solid rgba(239, 68, 68, 0.3)",
+              }}
             >
-              <p className="text-red-400 text-sm">{userError}</p>
+              <p
+                style={{
+                  color: "#ef4444",
+                  fontSize: "14px",
+                  fontFamily:
+                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                }}
+              >
+                {userError}
+              </p>
             </motion.div>
           )}
 
@@ -110,11 +217,29 @@ function SignupContent() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.5 }}
-              className="fixed top-24 sm:top-28 right-4 sm:right-8 z-50 glass-light rounded-full px-4 sm:px-5 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 shadow-lg border border-white/10 hover:border-white/20 transition-all group"
+              className="fixed top-24 sm:top-28 right-4 sm:right-8 z-50 rounded-full px-4 sm:px-5 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 shadow-lg transition-all group"
+              style={{
+                backgroundColor: "#1a1a1a",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+              }}
             >
               {/* User Avatar Circle */}
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-linear-to-br from-white/20 to-white/10 flex items-center justify-center shrink-0 border border-white/20">
-                <span className="text-white font-semibold text-xs sm:text-sm">
+              <div
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0"
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                }}
+              >
+                <span
+                  style={{
+                    color: "#e0e0e0",
+                    fontWeight: 600,
+                    fontSize: "12px",
+                    fontFamily:
+                      "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                  }}
+                >
                   {user.firstName?.[0]}
                   {user.lastName?.[0]}
                 </span>
@@ -122,10 +247,27 @@ function SignupContent() {
 
               {/* User Info */}
               <div className="hidden sm:flex flex-col items-start">
-                <span className="text-white font-medium text-sm leading-tight">
+                <span
+                  style={{
+                    color: "#e0e0e0",
+                    fontWeight: 500,
+                    fontSize: "14px",
+                    lineHeight: 1.2,
+                    fontFamily:
+                      "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                  }}
+                >
                   {user.firstName} {user.lastName}
                 </span>
-                <span className="text-[#a0a0a0] text-xs leading-tight">
+                <span
+                  style={{
+                    color: "#888888",
+                    fontSize: "12px",
+                    lineHeight: 1.2,
+                    fontFamily:
+                      "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                  }}
+                >
                   {user.email}
                 </span>
               </div>
@@ -133,15 +275,40 @@ function SignupContent() {
               {/* Mobile: Just show initials, expand on hover */}
               <div className="sm:hidden">
                 <div className="group-hover:hidden">
-                  <span className="text-white text-xs font-medium">
+                  <span
+                    style={{
+                      color: "#e0e0e0",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      fontFamily:
+                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                    }}
+                  >
                     {user.firstName}
                   </span>
                 </div>
                 <div className="hidden group-hover:flex flex-col">
-                  <span className="text-white text-xs font-medium whitespace-nowrap">
+                  <span
+                    style={{
+                      color: "#e0e0e0",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                      fontFamily:
+                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                    }}
+                  >
                     {user.firstName} {user.lastName}
                   </span>
-                  <span className="text-[#a0a0a0] text-xs truncate max-w-[120px]">
+                  <span
+                    style={{
+                      color: "#888888",
+                      fontSize: "12px",
+                      fontFamily:
+                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                    }}
+                    className="truncate max-w-[120px]"
+                  >
                     {user.email}
                   </span>
                 </div>
@@ -167,10 +334,30 @@ function SignupContent() {
                 transition={{ duration: 0.6 }}
                 className="text-center mb-8 sm:mb-12 md:mb-16"
               >
-                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight">
+                <h1
+                  style={{
+                    fontSize: "clamp(32px, 6vw, 64px)",
+                    fontWeight: 800,
+                    color: "#e0e0e0",
+                    marginBottom: "24px",
+                    lineHeight: 1.2,
+                    fontFamily: "'OggText', 'Ogg', serif",
+                  }}
+                >
                   Put Your Money Where Your Goals Are
                 </h1>
-                <p className="text-base sm:text-lg md:text-xl text-[#a0a0a0] max-w-2xl mx-auto px-2">
+                <p
+                  style={{
+                    fontSize: "clamp(16px, 2vw, 20px)",
+                    color: "#b0b0b0",
+                    maxWidth: "600px",
+                    margin: "0 auto",
+                    padding: "0 16px",
+                    fontFamily:
+                      "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                    lineHeight: 1.5,
+                  }}
+                >
                   Monthly subscription that rewards your progress. The more you
                   complete, the more you earn back.
                 </p>
@@ -183,38 +370,107 @@ function SignupContent() {
                 transition={{ duration: 0.6, delay: 0.2 }}
                 className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12 md:mb-16"
               >
-                <div className="glass-light rounded-xl sm:rounded-2xl p-5 sm:p-6">
-                  <Target className="w-8 h-8 sm:w-10 sm:h-10 text-white mb-3 sm:mb-4" />
-                  <h3 className="text-base sm:text-lg font-semibold text-white mb-2">
-                    Set Your Goal
-                  </h3>
-                  <p className="text-[#a0a0a0] text-sm">
-                    Define your goal and commit $144 to hold yourself
+                <NeumorphicCard centerContent>
+                  <div style={{ marginBottom: "8px" }}>
+                    <Target size={28} color="#888888" strokeWidth={1.5} />
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "'OggText', 'Ogg', serif",
+                      fontWeight: 800,
+                      fontSize: "12px",
+                      color: "#666666",
+                      letterSpacing: "2.2px",
+                      marginBottom: "16px",
+                      marginTop: "8px",
+                      textAlign: "center",
+                    }}
+                  >
+                    SET YOUR GOAL
+                  </div>
+                  <p
+                    style={{
+                      fontFamily:
+                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                      fontSize: "16px",
+                      fontWeight: 500,
+                      color: "#b0b0b0",
+                      lineHeight: "20px",
+                      textAlign: "center",
+                    }}
+                  >
+                    Define your goal and commit $98 to hold yourself
                     accountable.
                   </p>
-                </div>
+                </NeumorphicCard>
 
-                <div className="glass-light rounded-xl sm:rounded-2xl p-5 sm:p-6">
-                  <TrendingUp className="w-8 h-8 sm:w-10 sm:h-10 text-white mb-3 sm:mb-4" />
-                  <h3 className="text-base sm:text-lg font-semibold text-white mb-2">
-                    Track Progress
-                  </h3>
-                  <p className="text-[#a0a0a0] text-sm">
+                <NeumorphicCard centerContent>
+                  <div style={{ marginBottom: "8px" }}>
+                    <TrendingUp size={28} color="#888888" strokeWidth={1.5} />
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "'OggText', 'Ogg', serif",
+                      fontWeight: 800,
+                      fontSize: "12px",
+                      color: "#666666",
+                      letterSpacing: "2.2px",
+                      marginBottom: "16px",
+                      marginTop: "8px",
+                      textAlign: "center",
+                    }}
+                  >
+                    TRACK PROGRESS
+                  </div>
+                  <p
+                    style={{
+                      fontFamily:
+                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                      fontSize: "16px",
+                      fontWeight: 500,
+                      color: "#b0b0b0",
+                      lineHeight: "20px",
+                      textAlign: "center",
+                    }}
+                  >
                     Complete tasks and milestones toward your goal. Every step
                     counts.
                   </p>
-                </div>
+                </NeumorphicCard>
 
-                <div className="glass-light rounded-xl sm:rounded-2xl p-5 sm:p-6">
-                  <DollarSign className="w-8 h-8 sm:w-10 sm:h-10 text-white mb-3 sm:mb-4" />
-                  <h3 className="text-base sm:text-lg font-semibold text-white mb-2">
-                    Earn Money Back
-                  </h3>
-                  <p className="text-[#a0a0a0] text-sm">
-                    The more you achieve, the more you earn back. Hit 90%+ for a
-                    full refund.
+                <NeumorphicCard centerContent>
+                  <div style={{ marginBottom: "8px" }}>
+                    <DollarSign size={28} color="#888888" strokeWidth={1.5} />
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "'OggText', 'Ogg', serif",
+                      fontWeight: 800,
+                      fontSize: "12px",
+                      color: "#666666",
+                      letterSpacing: "2.2px",
+                      marginBottom: "16px",
+                      marginTop: "8px",
+                      textAlign: "center",
+                    }}
+                  >
+                    EARN MONEY BACK
+                  </div>
+                  <p
+                    style={{
+                      fontFamily:
+                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                      fontSize: "16px",
+                      fontWeight: 500,
+                      color: "#b0b0b0",
+                      lineHeight: "20px",
+                      textAlign: "center",
+                    }}
+                  >
+                    The more you achieve, the more you earn back. Hit 90%+ for
+                    maximum rewards.
                   </p>
-                </div>
+                </NeumorphicCard>
               </motion.div>
 
               {/* Main Commitment Plan */}
@@ -224,175 +480,517 @@ function SignupContent() {
                 transition={{ duration: 0.6, delay: 0.4 }}
                 className="max-w-3xl mx-auto"
               >
-                <div className="relative glass-light rounded-xl sm:rounded-2xl p-5 sm:p-6 md:p-8 border-2 border-white">
-                  <div className="absolute -top-3 sm:-top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-white text-black px-3 sm:px-4 py-1 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap">
-                      Monthly Subscription
-                    </span>
-                  </div>
-
-                  {/* First Month */}
-                  <div className="text-center mb-6 sm:mb-8 mt-4 sm:mt-4">
-                    <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
-                      First Month
-                    </h3>
-                    <div className="flex items-baseline justify-center">
-                      <span className="text-4xl sm:text-5xl font-bold text-white">
-                        $98
+                <div className="relative">
+                  <NeumorphicCard className="border-2 border-white/10">
+                    <div
+                      className="absolute -top-7 sm:-top-8 left-1/2 transform -translate-x-1/2"
+                      style={{ zIndex: 3 }}
+                    >
+                      <span
+                        style={{
+                          backgroundColor: "#888888",
+                          color: "#1a1a1a",
+                          padding: "4px 16px",
+                          borderRadius: "20px",
+                          fontSize: "12px",
+                          fontWeight: 800,
+                          letterSpacing: "1.5px",
+                          fontFamily: "'OggText', 'Ogg', serif",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        MONTHLY SUBSCRIPTION
                       </span>
                     </div>
-                    <p className="text-[#a0a0a0] mt-2 text-sm sm:text-base">
-                      Full refund possible - prove your commitment
-                    </p>
-                  </div>
 
-                  {/* First Month Refund Structure */}
-                  <div className="glass-medium rounded-lg sm:rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
-                    <h4 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4 text-center">
-                      First Month Earnings
-                    </h4>
-                    <div className="space-y-3 sm:space-y-4">
-                      <div className="flex items-center justify-between p-3 sm:p-4 rounded-lg bg-[rgba(255,255,255,0.03)]">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-orange-500 shrink-0"></div>
-                          <span className="text-[#a0a0a0] text-xs sm:text-sm">
-                            0-70% completion
-                          </span>
-                        </div>
-                        <span className="text-white font-semibold text-xs sm:text-sm whitespace-nowrap ml-2">
-                          $0 back
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 sm:p-4 rounded-lg bg-[rgba(255,255,255,0.03)]">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-yellow-500 shrink-0"></div>
-                          <span className="text-[#a0a0a0] text-xs sm:text-sm">
-                            70-90% completion
-                          </span>
-                        </div>
-                        <span className="text-white font-semibold text-xs sm:text-sm whitespace-nowrap ml-2">
-                          $50 back
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 sm:p-4 rounded-lg bg-[rgba(255,255,255,0.03)] border border-green-500/30">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 shrink-0"></div>
-                          <span className="text-[#a0a0a0] text-xs sm:text-sm">
-                            90%+ completion
-                          </span>
-                        </div>
-                        <span className="text-green-400 font-semibold text-xs sm:text-sm whitespace-nowrap ml-2">
-                          All back ($98)
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Following Months */}
-                  <div className="border-t border-glass-light pt-6 sm:pt-8 mb-6 sm:mb-8">
-                    <div className="text-center mb-4 sm:mb-6">
-                      <h3 className="text-lg sm:text-xl font-bold text-white mb-2">
-                        Following Months
+                    {/* First Month */}
+                    <div className="text-center mb-6 sm:mb-8 mt-4 sm:mt-4">
+                      <h3
+                        style={{
+                          fontSize: "24px",
+                          fontWeight: 800,
+                          color: "#e0e0e0",
+                          marginBottom: "8px",
+                          fontFamily: "'OggText', 'Ogg', serif",
+                        }}
+                      >
+                        First Month
                       </h3>
                       <div className="flex items-baseline justify-center">
-                        <span className="text-3xl sm:text-4xl font-bold text-white">
+                        <span
+                          style={{
+                            fontSize: "48px",
+                            fontWeight: 800,
+                            color: "#e0e0e0",
+                            fontFamily: "'OggText', 'Ogg', serif",
+                          }}
+                        >
                           $98
                         </span>
-                        <span className="text-[#a0a0a0] ml-2">/month</span>
                       </div>
-                      <p className="text-[#a0a0a0] mt-2 text-sm">
-                        $48 processing fee • Up to $50 back
+                      <p
+                        style={{
+                          color: "#b0b0b0",
+                          marginTop: "8px",
+                          fontSize: "14px",
+                          fontFamily:
+                            "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                        }}
+                      >
+                        Full refund possible - prove your commitment
                       </p>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 sm:p-4 rounded-lg bg-[rgba(255,255,255,0.03)]">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500 shrink-0"></div>
-                          <span className="text-[#a0a0a0] text-xs sm:text-sm">
-                            0-70% completion
+                    {/* First Month Refund Structure */}
+                    <div
+                      style={{
+                        backgroundColor: "rgba(0,0,0,0.3)",
+                        borderRadius: "16px",
+                        padding: "24px",
+                        marginBottom: "32px",
+                        border: "1px solid rgba(255, 255, 255, 0.05)",
+                      }}
+                    >
+                      <h4
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: 800,
+                          color: "#b0b0b0",
+                          marginBottom: "16px",
+                          textAlign: "center",
+                          fontFamily: "'OggText', 'Ogg', serif",
+                        }}
+                      >
+                        First Month Earnings
+                      </h4>
+                      <div className="space-y-3 sm:space-y-4">
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "12px 16px",
+                            borderRadius: "12px",
+                            backgroundColor: "rgba(0,0,0,0.2)",
+                          }}
+                        >
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500 shrink-0"></div>
+                            <span
+                              style={{
+                                color: "#888888",
+                                fontSize: "14px",
+                                fontFamily:
+                                  "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                              }}
+                            >
+                              Below 50%
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              color: "#b0b0b0",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              fontFamily:
+                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            }}
+                          >
+                            $0 back
                           </span>
                         </div>
-                        <span className="text-white font-semibold text-xs sm:text-sm whitespace-nowrap ml-2">
-                          $0 back
-                        </span>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "12px 16px",
+                            borderRadius: "12px",
+                            backgroundColor: "rgba(0,0,0,0.2)",
+                          }}
+                        >
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-orange-500 shrink-0"></div>
+                            <span
+                              style={{
+                                color: "#888888",
+                                fontSize: "14px",
+                                fontFamily:
+                                  "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                              }}
+                            >
+                              50-69%
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              color: "#b0b0b0",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              fontFamily:
+                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            }}
+                          >
+                            $30 back
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "12px 16px",
+                            borderRadius: "12px",
+                            backgroundColor: "rgba(0,0,0,0.2)",
+                          }}
+                        >
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-yellow-500 shrink-0"></div>
+                            <span
+                              style={{
+                                color: "#888888",
+                                fontSize: "14px",
+                                fontFamily:
+                                  "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                              }}
+                            >
+                              70-89%
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              color: "#b0b0b0",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              fontFamily:
+                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            }}
+                          >
+                            $49 back
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "12px 16px",
+                            borderRadius: "12px",
+                            backgroundColor: "rgba(0,0,0,0.2)",
+                            border: "1px solid rgba(34, 197, 94, 0.2)",
+                          }}
+                        >
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 shrink-0"></div>
+                            <span
+                              style={{
+                                color: "#888888",
+                                fontSize: "14px",
+                                fontFamily:
+                                  "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                              }}
+                            >
+                              90%+
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              color: "#22c55e",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              fontFamily:
+                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            }}
+                          >
+                            All back ($98)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Following Months */}
+                    <div
+                      style={{
+                        borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+                        paddingTop: "32px",
+                        marginBottom: "32px",
+                      }}
+                    >
+                      <div className="text-center mb-4 sm:mb-6">
+                        <h3
+                          style={{
+                            fontSize: "20px",
+                            fontWeight: 800,
+                            color: "#e0e0e0",
+                            marginBottom: "8px",
+                            fontFamily: "'OggText', 'Ogg', serif",
+                          }}
+                        >
+                          Following Months
+                        </h3>
+                        <div className="flex items-baseline justify-center">
+                          <span
+                            style={{
+                              fontSize: "36px",
+                              fontWeight: 800,
+                              color: "#e0e0e0",
+                              fontFamily: "'OggText', 'Ogg', serif",
+                            }}
+                          >
+                            $98
+                          </span>
+                          <span
+                            style={{
+                              color: "#b0b0b0",
+                              marginLeft: "8px",
+                              fontFamily:
+                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            }}
+                          >
+                            /month
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            color: "#888888",
+                            marginTop: "8px",
+                            fontSize: "14px",
+                            fontFamily:
+                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                          }}
+                        >
+                          $48 processing fee • Up to $50 back
+                        </p>
                       </div>
 
-                      <div className="flex items-center justify-between p-3 sm:p-4 rounded-lg bg-[rgba(255,255,255,0.03)]">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-yellow-500 shrink-0"></div>
-                          <span className="text-[#a0a0a0] text-xs sm:text-sm">
-                            70-90% completion
+                      <div className="space-y-3">
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "12px 16px",
+                            borderRadius: "12px",
+                            backgroundColor: "rgba(0,0,0,0.2)",
+                          }}
+                        >
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500 shrink-0"></div>
+                            <span
+                              style={{
+                                color: "#888888",
+                                fontSize: "14px",
+                                fontFamily:
+                                  "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                              }}
+                            >
+                              Below 70%
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              color: "#b0b0b0",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              fontFamily:
+                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            }}
+                          >
+                            $0 back
                           </span>
                         </div>
-                        <span className="text-white font-semibold text-xs sm:text-sm whitespace-nowrap ml-2">
-                          $25 back
-                        </span>
-                      </div>
 
-                      <div className="flex items-center justify-between p-3 sm:p-4 rounded-lg bg-[rgba(255,255,255,0.03)] border border-green-500/30">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 shrink-0"></div>
-                          <span className="text-[#a0a0a0] text-xs sm:text-sm">
-                            90%+ completion
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "12px 16px",
+                            borderRadius: "12px",
+                            backgroundColor: "rgba(0,0,0,0.2)",
+                          }}
+                        >
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-yellow-500 shrink-0"></div>
+                            <span
+                              style={{
+                                color: "#888888",
+                                fontSize: "14px",
+                                fontFamily:
+                                  "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                              }}
+                            >
+                              70-89%
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              color: "#b0b0b0",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              fontFamily:
+                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            }}
+                          >
+                            $25 back
                           </span>
                         </div>
-                        <span className="text-green-400 font-semibold text-xs sm:text-sm whitespace-nowrap ml-2">
-                          $50 back
+
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "12px 16px",
+                            borderRadius: "12px",
+                            backgroundColor: "rgba(0,0,0,0.2)",
+                            border: "1px solid rgba(34, 197, 94, 0.2)",
+                          }}
+                        >
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 shrink-0"></div>
+                            <span
+                              style={{
+                                color: "#888888",
+                                fontSize: "14px",
+                                fontFamily:
+                                  "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                              }}
+                            >
+                              90%+
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              color: "#22c55e",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              fontFamily:
+                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            }}
+                          >
+                            $50 back
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Terms Agreement */}
+                    <div className="mb-6">
+                      <div
+                        className="flex items-start gap-3 cursor-pointer group"
+                        onClick={() => setAgreedToTerms(!agreedToTerms)}
+                      >
+                        <div className="relative mt-1 shrink-0">
+                          <div
+                            style={{
+                              width: "20px",
+                              height: "20px",
+                              borderRadius: "6px",
+                              backgroundColor: "#1a1a1a",
+                              border: "1px solid rgba(255, 255, 255, 0.1)",
+                              position: "relative",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              boxShadow: agreedToTerms
+                                ? "inset 2px 2px 4px rgba(0,0,0,0.5), inset -1px -1px 3px rgba(255,255,255,0.05)"
+                                : "inset 2px 2px 5px rgba(0,0,0,0.6), inset -2px -2px 4px rgba(255,255,255,0.03)",
+                            }}
+                          >
+                            {agreedToTerms && (
+                              <svg
+                                width="20"
+                                height="20"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                style={{
+                                  position: "absolute",
+                                  top: "0",
+                                  left: "0",
+                                  pointerEvents: "none",
+                                }}
+                              >
+                                <path
+                                  d="M5 10L8.5 13.5L15 7"
+                                  stroke="#b0b0b0"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                        <span
+                          style={{
+                            color: "#888888",
+                            fontSize: "14px",
+                            lineHeight: "1.5",
+                            fontFamily:
+                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                          }}
+                          className="group-hover:text-[#b0b0b0] transition-colors"
+                        >
+                          I understand this is a monthly subscription with
+                          different pricing and refund structures. I commit to
+                          tracking my progress honestly and understand that
+                          refunds are based on verified completion percentages.
+                          I can cancel anytime.
                         </span>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Terms Agreement */}
-                  <div className="mb-6">
-                    <label className="flex items-start gap-3 cursor-pointer group">
-                      <input
-                        type="checkbox"
-                        checked={agreedToTerms}
-                        onChange={(e) => setAgreedToTerms(e.target.checked)}
-                        className="mt-1 w-5 h-5 rounded border-2 border-white/30 bg-transparent checked:bg-white checked:border-white transition-all cursor-pointer"
-                      />
-                      <span className="text-[#a0a0a0] text-sm group-hover:text-white transition-colors">
-                        I understand this is a monthly subscription with
-                        different pricing and refund structures. I commit to
-                        tracking my progress honestly and understand that
-                        refunds are based on verified completion percentages. I
-                        can cancel anytime.
-                      </span>
-                    </label>
-                  </div>
-
-                  {/* CTA Button */}
-                  <motion.button
-                    onClick={handleStartCommitment}
-                    disabled={!agreedToTerms || !!userError || loadingUser}
-                    className={`w-full py-4 rounded-xl font-semibold transition-all ${
-                      agreedToTerms && !userError && !loadingUser
-                        ? "bg-white text-black hover:bg-[#f5f5f5] cursor-pointer"
-                        : "glass-light text-[#a0a0a0] cursor-not-allowed"
-                    }`}
-                    whileHover={
-                      agreedToTerms && !userError && !loadingUser
-                        ? { scale: 1.02 }
-                        : {}
-                    }
-                    whileTap={
-                      agreedToTerms && !userError && !loadingUser
-                        ? { scale: 0.98 }
-                        : {}
-                    }
-                  >
-                    {userError
-                      ? "Cannot proceed - User error"
-                      : loadingUser
-                      ? "Loading..."
-                      : agreedToTerms
-                      ? "Commit to My Goal"
-                      : "Please agree to terms"}
-                  </motion.button>
+                    {/* CTA Button */}
+                    <motion.button
+                      onClick={handleStartCommitment}
+                      disabled={!agreedToTerms || !!userError || loadingUser}
+                      style={{
+                        width: "100%",
+                        padding: "16px",
+                        borderRadius: "16px",
+                        fontWeight: 700,
+                        fontSize: "16px",
+                        letterSpacing: "0.5px",
+                        transition: "all 0.3s ease",
+                        fontFamily:
+                          "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                        ...(agreedToTerms && !userError && !loadingUser
+                          ? {
+                              backgroundColor: "#e0e0e0",
+                              color: "#1a1a1a",
+                              cursor: "pointer",
+                              border: "1px solid rgba(255, 255, 255, 0.1)",
+                            }
+                          : {
+                              backgroundColor: "rgba(0,0,0,0.3)",
+                              color: "#666666",
+                              cursor: "not-allowed",
+                              border: "1px solid rgba(255, 255, 255, 0.05)",
+                            }),
+                      }}
+                      whileHover={
+                        agreedToTerms && !userError && !loadingUser
+                          ? { scale: 1.02, backgroundColor: "#f0f0f0" }
+                          : {}
+                      }
+                      whileTap={
+                        agreedToTerms && !userError && !loadingUser
+                          ? { scale: 0.98 }
+                          : {}
+                      }
+                    >
+                      {userError
+                        ? "Cannot proceed - User error"
+                        : loadingUser
+                        ? "Loading..."
+                        : agreedToTerms
+                        ? "Commit to My Goal"
+                        : "Please agree to terms"}
+                    </motion.button>
+                  </NeumorphicCard>
                 </div>
               </motion.div>
 
@@ -403,10 +1001,24 @@ function SignupContent() {
                 transition={{ duration: 0.6, delay: 0.6 }}
                 className="text-center mt-8 sm:mt-12 md:mt-16 space-y-2 sm:space-y-4 px-4"
               >
-                <p className="text-[#a0a0a0] text-xs sm:text-sm">
+                <p
+                  style={{
+                    color: "#888888",
+                    fontSize: "14px",
+                    fontFamily:
+                      "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                  }}
+                >
                   🔒 Secure payment processing powered by Stripe
                 </p>
-                <p className="text-[#a0a0a0] text-xs sm:text-sm">
+                <p
+                  style={{
+                    color: "#888888",
+                    fontSize: "14px",
+                    fontFamily:
+                      "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                  }}
+                >
                   Your commitment is safe and refunds are processed
                   automatically
                 </p>
@@ -421,13 +1033,36 @@ function SignupContent() {
               className="max-w-5xl mx-auto"
             >
               <div className="mb-6 sm:mb-8 text-center px-2">
-                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 sm:mb-4">
+                <h2
+                  style={{
+                    fontSize: "clamp(24px, 4vw, 32px)",
+                    fontWeight: 800,
+                    color: "#e0e0e0",
+                    marginBottom: "16px",
+                    fontFamily: "'OggText', 'Ogg', serif",
+                  }}
+                >
                   Complete Your Commitment
                 </h2>
-                <p className="text-[#a0a0a0] mb-2 text-sm sm:text-base">
+                <p
+                  style={{
+                    color: "#b0b0b0",
+                    marginBottom: "8px",
+                    fontSize: "16px",
+                    fontFamily:
+                      "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                  }}
+                >
                   Secure payment powered by Stripe
                 </p>
-                <p className="text-xs sm:text-sm text-[#808080]">
+                <p
+                  style={{
+                    fontSize: "14px",
+                    color: "#888888",
+                    fontFamily:
+                      "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                  }}
+                >
                   All payment information is encrypted and secure
                 </p>
               </div>
@@ -439,7 +1074,16 @@ function SignupContent() {
 
               <button
                 onClick={() => setShowCheckout(false)}
-                className="mt-6 sm:mt-8 text-[#a0a0a0] hover:text-white transition-colors mx-auto block font-medium text-sm sm:text-base"
+                style={{
+                  marginTop: "32px",
+                  color: "#888888",
+                  fontWeight: 500,
+                  fontSize: "16px",
+                  transition: "color 0.3s ease",
+                  fontFamily:
+                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                }}
+                className="hover:text-[#b0b0b0] mx-auto block"
               >
                 ← Go back
               </button>
@@ -458,8 +1102,19 @@ export default function SignupPage() {
       fallback={
         <div className="min-h-screen bg-black flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-white">Loading...</p>
+            <div
+              className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 mx-auto mb-4"
+              style={{ borderColor: "#888888" }}
+            ></div>
+            <p
+              style={{
+                color: "#b0b0b0",
+                fontFamily:
+                  "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+              }}
+            >
+              Loading...
+            </p>
           </div>
         </div>
       }
