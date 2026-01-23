@@ -711,8 +711,8 @@ function SignupContent() {
                       </div>
                     </div>
 
-                    {/* Following Months */}
-                    <div
+                    {/* Following Months - COMMENTED OUT */}
+                    {/* <div
                       style={{
                         borderTop: "1px solid rgba(255, 255, 255, 0.08)",
                         paddingTop: "32px",
@@ -876,7 +876,7 @@ function SignupContent() {
                           </span>
                         </div>
                       </div>
-                    </div>
+                    </div> */}
 
                     {/* Terms Agreement */}
                     <div className="mb-6">
