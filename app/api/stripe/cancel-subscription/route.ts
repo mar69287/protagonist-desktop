@@ -1,58 +1,74 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { dynamoDb, TableNames } from "@/services/aws/dynamodb";
-import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { authenticatedUser } from "@/services/aws/amplify-server-utils";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-10-29.clover",
 });
 
-export async function POST(request: NextRequest) {
-  try {
-    const { userId } = await request.json();
+export async function POST(req: Request) {
+  const response = NextResponse.next();
 
-    if (!userId) {
+  try {
+    // Get authenticated user
+    const cognitoUser = await authenticatedUser({
+      request: req as any,
+      response: response as any,
+    });
+
+    if (!cognitoUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { subscriptionId } = await req.json();
+
+    if (!subscriptionId) {
       return NextResponse.json(
-        { error: "User ID is required" },
+        { error: "Subscription ID is required" },
         { status: 400 }
       );
     }
 
-    // Get user to find their subscription ID
-    const userResult = await dynamoDb.send(
-      new GetCommand({
-        TableName: TableNames.USERS,
-        Key: { userId },
-      })
-    );
+    // Cancel the subscription at period end in Stripe
+    const subscription = (await stripe.subscriptions.update(subscriptionId, {
+      cancel_at_period_end: true,
+    })) as any;
 
-    const user = userResult.Item;
-    if (!user || !user.stripeSubscriptionId) {
+    // Check for required AWS credentials
+    if (
+      !process.env.AWS_ACCESS_KEY_ID_NEXT ||
+      !process.env.AWS_SECRET_ACCESS_KEY_NEXT
+    ) {
+      console.error("Missing AWS credentials in environment variables");
       return NextResponse.json(
-        { error: "No active subscription found for this user" },
-        { status: 404 }
+        { error: "Server configuration error" },
+        { status: 500 }
       );
     }
 
-    // Cancel subscription at period end (user keeps access until billing period ends)
-    const subscription = await stripe.subscriptions.update(
-      user.stripeSubscriptionId,
-      {
-        cancel_at_period_end: true,
-      }
-    );
+    // Create DynamoDB client with credentials
+    const client = new DynamoDBClient({
+      region: process.env.AWS_REGION || "us-west-1",
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID_NEXT,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY_NEXT,
+      },
+    });
+    const dynamodb = DynamoDBDocumentClient.from(client);
 
-    // Update user immediately in database (webhook will also update as backup)
-    await dynamoDb.send(
+    // Update user in DynamoDB using Cognito sub as userId
+    await dynamodb.send(
       new UpdateCommand({
-        TableName: TableNames.USERS,
-        Key: { userId },
-        UpdateExpression: `
-          SET cancelAtPeriodEnd = :cancelAtPeriodEnd,
-              updatedAt = :updatedAt
-        `,
+        TableName: process.env.DYNAMODB_USERS_TABLE || "users",
+        Key: {
+          userId: cognitoUser.userId, // Cognito sub ID
+        },
+        UpdateExpression:
+          "SET cancelAtPeriodEnd = :cancel, updatedAt = :updatedAt",
         ExpressionAttributeValues: {
-          ":cancelAtPeriodEnd": true,
+          ":cancel": true,
           ":updatedAt": new Date().toISOString(),
         },
       })
@@ -60,19 +76,29 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      message:
-        "Subscription will be cancelled at the end of the billing period",
-    });
-  } catch (error) {
-    console.error("Error canceling subscription:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to cancel subscription",
+      subscription: {
+        id: subscription.id,
+        status: subscription.status,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        currentPeriodEnd: subscription.current_period_end
+          ? new Date(
+              (subscription.current_period_end as number) * 1000
+            ).toISOString()
+          : null,
       },
+    });
+  } catch (error: any) {
+    console.error("Error cancelling subscription:", error);
+
+    if (error.type === "StripeInvalidRequestError") {
+      return NextResponse.json(
+        { error: "Subscription not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: error.message || "Failed to cancel subscription" },
       { status: 500 }
     );
   }

@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { signIn, signOut, signUp, getCurrentUser, fetchAuthSession } from "aws-amplify/auth";
+import { Hub } from "aws-amplify/utils";
 
 interface User {
   id: string;
@@ -25,33 +27,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check for existing session on mount
   useEffect(() => {
-    const checkAuth = () => {
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
-      setLoading(false);
-    };
-
     checkAuth();
+
+    // Listen for auth events
+    const hubListener = Hub.listen("auth", ({ payload }) => {
+      switch (payload.event) {
+        case "signedIn":
+          checkAuth();
+          break;
+        case "signedOut":
+          setUser(null);
+          break;
+      }
+    });
+
+    return () => hubListener();
   }, []);
+
+  const checkAuth = async () => {
+    try {
+      const session = await fetchAuthSession();
+      if (session.tokens) {
+        const currentUser = await getCurrentUser();
+        const userAttributes = currentUser.signInDetails?.loginId || "";
+        
+        setUser({
+          id: currentUser.userId,
+          email: userAttributes,
+          name: currentUser.username,
+        });
+      } else {
+        setUser(null);
+      }
+    } catch (error) {
+      console.log("Not authenticated:", error);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      
-      const mockUser = {
-        id: "1",
-        email,
-        name: email.split("@")[0],
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem("user", JSON.stringify(mockUser));
-    } catch (error) {
-      throw new Error("Login failed");
+      await signIn({ username: email, password });
+      await checkAuth();
+    } catch (error: any) {
+      console.error("Login error:", error);
+      throw new Error(error.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -60,27 +83,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = async (email: string, password: string, name: string) => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      
-      const mockUser = {
-        id: "1",
-        email,
-        name,
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem("user", JSON.stringify(mockUser));
-    } catch (error) {
-      throw new Error("Signup failed");
+      await signUp({
+        username: email,
+        password,
+        options: {
+          userAttributes: {
+            email,
+            name,
+          },
+        },
+      });
+      // After signup, user needs to verify email before signing in
+      // You may want to redirect to a verification page
+    } catch (error: any) {
+      console.error("Signup error:", error);
+      throw new Error(error.message || "Signup failed");
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
+  const logout = async () => {
+    try {
+      await signOut();
+      setUser(null);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   const value = {
