@@ -231,32 +231,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
 
     // If this is the first subscription, set it to cancel at period end
     if (isFirstSubscription) {
-      console.log(
-        `First subscription for user ${userId} - setting cancel_at_period_end to true`
-      );
-
-      // Update Stripe subscription to cancel at period end
-      await stripe.subscriptions.update(fullSubscription.id, {
-        cancel_at_period_end: true,
-      });
-
-      console.log(
-        `Subscription ${fullSubscription.id} set to cancel at period end`
-      );
-
-      // Update DynamoDB to reflect this
-      await dynamoDb.send(
-        new UpdateCommand({
-          TableName: TableNames.USERS,
-          Key: { userId: userId },
-          UpdateExpression: "SET cancelAtPeriodEnd = :cancel",
-          ExpressionAttributeValues: {
-            ":cancel": true,
-          },
-        })
-      );
-
-      console.log(`User ${userId} - creating Challenge`);
+      console.log(`First subscription for user ${userId} - creating Challenge`);
 
       // Fetch onboarding data
       const onboardingData = await dynamoDb.send(
