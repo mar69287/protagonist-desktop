@@ -214,9 +214,9 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
 
     const { GetCommand, QueryCommand } = await import("@aws-sdk/lib-dynamodb");
 
-    const paymentHistory = await dynamoDb.send(
+    const existingChallenges = await dynamoDb.send(
       new QueryCommand({
-        TableName: TableNames.PAYMENT_HISTORY,
+        TableName: TableNames.CHALLENGES,
         IndexName: "userId-createdAt-index",
         KeyConditionExpression: "userId = :userId",
         ExpressionAttributeValues: {
@@ -227,11 +227,34 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     );
 
     const isFirstSubscription =
-      !paymentHistory.Items || paymentHistory.Items.length === 0;
+      !existingChallenges.Items || existingChallenges.Items.length === 0;
 
     // If this is the first subscription, set it to cancel at period end
     if (isFirstSubscription) {
-      console.log(`First subscription for user ${userId} - creating Challenge`);
+      console.log(
+        `First subscription for user ${userId} - setting cancel_at_period_end to true`
+      );
+
+      // Update Stripe subscription to cancel at period end
+      await stripe.subscriptions.update(fullSubscription.id, {
+        cancel_at_period_end: true,
+      });
+
+      console.log(
+        `Subscription ${fullSubscription.id} set to cancel at period end`
+      );
+
+      // Update DynamoDB to reflect this
+      await dynamoDb.send(
+        new UpdateCommand({
+          TableName: TableNames.USERS,
+          Key: { userId: userId },
+          UpdateExpression: "SET cancelAtPeriodEnd = :cancel",
+          ExpressionAttributeValues: {
+            ":cancel": true,
+          },
+        })
+      );
 
       // Fetch onboarding data
       const onboardingData = await dynamoDb.send(
@@ -348,7 +371,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       // when we have the paymentId
     } else {
       console.log(
-        `User ${userId} has existing payment history - skipping Challenge creation`
+        `User ${userId} has existing challenge - skipping Challenge creation`
       );
     }
   } catch (error) {
