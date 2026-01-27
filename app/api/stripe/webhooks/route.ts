@@ -308,6 +308,12 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
         }
       }
 
+      // Capitalize first letter of why
+      const why =
+        onboarding.why && onboarding.why.length > 0
+          ? onboarding.why.charAt(0).toUpperCase() + onboarding.why.slice(1)
+          : onboarding.why;
+
       // Create Challenge record
       await dynamoDb.send(
         new PutCommand({
@@ -325,6 +331,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
             proofMethod: onboarding.proofMethod,
             submissionType: onboarding.submissionType,
             timezone: onboarding.timezone,
+            why: why,
 
             // Structured schedule for logic
             scheduleDays: structuredSchedule.days || [],
