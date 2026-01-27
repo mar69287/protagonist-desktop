@@ -77,12 +77,13 @@ export async function POST(request: NextRequest) {
     // Billing period boundaries
     const subscriptionStart = new Date(user.currentPeriodStart);
     const subscriptionEnd = new Date(user.currentPeriodEnd);
-    const checkTime = new Date(subscriptionEnd.getTime() - 3600000); // 1 hour before end
+    const checkTime = new Date(subscriptionEnd.getTime() - 3600000); // 1 hour before end (for deadline check)
+    const now = new Date();
 
     console.log(
       `Checking billing period: ${
         user.currentPeriodStart
-      } to ${checkTime.toISOString()}`
+      } to ${subscriptionEnd.toISOString()} (checking at ${checkTime.toISOString()})`
     );
 
     // Check if current challenge started before or after the billing period started
@@ -133,7 +134,6 @@ export async function POST(request: NextRequest) {
 
     // Collect all submission days from submissionCalendar(s) that fall within billing period
     const allRelevantSubmissions: SubmissionDay[] = [];
-    // const now = new Date(); // Temporarily disabled for testing
 
     console.log(
       `Checking ${challengesToCheck.length} challenge(s) for submissions:`,
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
         `\n=== DEBUG: Checking Challenge ${challenge.challengeId} ===`
       );
       console.log(
-        `Date Range: ${subscriptionStart.toISOString()} to ${checkTime.toISOString()}`
+        `Date Range: ${subscriptionStart.toISOString()} to ${checkTime.toISOString()} (period ends at ${subscriptionEnd.toISOString()})`
       );
       console.log(`Current time: ${new Date().toISOString()}`);
       console.log(
@@ -156,42 +156,51 @@ export async function POST(request: NextRequest) {
       );
 
       // Filter to submissions in billing period with proper criteria:
-      // 1. Submission date is within billing period
-      // 2. Deadline has PASSED (don't evaluate future submissions)
+      // 1. Submission targetDate is within billing period (subscriptionStart to subscriptionEnd)
+      // 2. Deadline is within billing period OR deadline has passed OR submission is already verified/denied
+      //    (This allows early submissions to count if they're already completed)
       // 3. NOT already checked in a previous refund period
-      // Note: We include ALL submissions with passed deadlines (verified, denied, missed, pending)
+      // Note: We include ALL submissions with deadlines in the period (verified, denied, missed, pending)
       // because they all count as "expected" submissions for the refund calculation
       const submissionsInPeriod = submissionCalendar.filter((day) => {
         const submissionDate = new Date(day.targetDate);
         const deadline = new Date(day.deadline);
-        const now = new Date();
 
-        // Must be in date range
+        // Must be in date range (use checkTime as upper bound - 1 hour before period end)
+        // This ensures we check submissions up to 1 hour before billing, giving time for refund processing
         const inDateRange =
           submissionDate >= subscriptionStart && submissionDate <= checkTime;
 
-        // Deadline must have passed
+        // Deadline must be:
+        // - Within the billing period (deadline <= subscriptionEnd), OR
+        // - Already passed (deadline <= now), OR
+        // - Submission is already completed (verified/denied) - counts early submissions
+        const deadlineInPeriod = deadline <= subscriptionEnd;
         const deadlinePassed = deadline <= now;
+        const isCompleted =
+          day.status === "verified" || day.status === "denied";
+        const deadlineEligible =
+          deadlineInPeriod || deadlinePassed || isCompleted;
 
         // Not already checked in a previous period
         const notAlreadyChecked = !day.refundCheckPeriod;
 
         // Debug logging for each submission
-        const passes = inDateRange && deadlinePassed && notAlreadyChecked;
+        const passes = inDateRange && deadlineEligible && notAlreadyChecked;
         console.log(
           `  ${day.targetDate} (${
             day.status
-          }): inRange=${inDateRange}, deadlinePassed=${deadlinePassed}, notChecked=${notAlreadyChecked} → ${
+          }): inRange=${inDateRange}, deadlineEligible=${deadlineEligible} (inPeriod=${deadlineInPeriod}, passed=${deadlinePassed}, completed=${isCompleted}), notChecked=${notAlreadyChecked} → ${
             passes ? "✅ INCLUDED" : "❌ EXCLUDED"
           }`
         );
-        if (!deadlinePassed) {
+        if (!deadlineEligible) {
           console.log(
-            `    └─ Deadline: ${deadline.toISOString()} vs Now: ${now.toISOString()}`
+            `    └─ Deadline: ${deadline.toISOString()}, Period End: ${subscriptionEnd.toISOString()}, Now: ${now.toISOString()}`
           );
         }
 
-        return inDateRange && deadlinePassed && notAlreadyChecked;
+        return inDateRange && deadlineEligible && notAlreadyChecked;
       });
 
       allRelevantSubmissions.push(...submissionsInPeriod);
