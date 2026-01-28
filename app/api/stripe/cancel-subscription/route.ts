@@ -49,8 +49,9 @@ export async function POST(req: Request) {
     }
 
     // Create DynamoDB client with credentials
+    // Use DYNAMODB_REGION instead of AWS_REGION (which is reserved by Netlify)
     const client = new DynamoDBClient({
-      region: process.env.AWS_REGION || "us-west-1",
+      region: process.env.DYNAMODB_REGION || "us-west-1",
       credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID_NEXT,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY_NEXT,

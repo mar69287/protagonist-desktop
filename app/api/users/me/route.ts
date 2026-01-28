@@ -31,7 +31,8 @@ export async function GET(req: Request) {
     }
 
     // Create DynamoDB client with credentials
-    const region = process.env.AWS_REGION || "us-west-1";
+    // Use DYNAMODB_REGION instead of AWS_REGION (which is reserved by Netlify)
+    const region = process.env.DYNAMODB_REGION || "us-west-1";
     const tableName = process.env.DYNAMODB_USERS_TABLE || "users";
 
     console.log("DynamoDB Configuration:", {
@@ -74,7 +75,7 @@ export async function GET(req: Request) {
       error: error.message,
       errorType: error.__type || error.name,
       tableName: process.env.DYNAMODB_USERS_TABLE || "users",
-      region: process.env.AWS_REGION || "us-west-1",
+      region: process.env.DYNAMODB_REGION || "us-west-1",
       userId: cognitoUser?.userId,
     });
 
@@ -88,7 +89,7 @@ export async function GET(req: Request) {
         {
           error: `DynamoDB table not found. Table: "${
             process.env.DYNAMODB_USERS_TABLE || "users"
-          }", Region: "${process.env.AWS_REGION || "us-west-1"}"`,
+          }", Region: "${process.env.DYNAMODB_REGION || "us-west-1"}"`,
         },
         { status: 500 }
       );

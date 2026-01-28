@@ -78,7 +78,7 @@ export async function GET(req: Request) {
         process.env.AWS_SECRET_ACCESS_KEY_NEXT
       ) {
         const client = new DynamoDBClient({
-          region: process.env.AWS_REGION || "us-west-1",
+          region: process.env.DYNAMODB_REGION || "us-west-1",
           credentials: {
             accessKeyId: process.env.AWS_ACCESS_KEY_ID_NEXT,
             secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY_NEXT,
