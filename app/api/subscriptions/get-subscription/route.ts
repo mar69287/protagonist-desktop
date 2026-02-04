@@ -11,22 +11,32 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export async function GET(req: Request) {
   const response = NextResponse.next();
 
+  console.log("🔍 [Get Subscription API] Request received");
+  console.log("🔍 [Get Subscription API] URL:", req.url);
+
   try {
     // Get authenticated user from Cognito
+    console.log("🔐 [Get Subscription API] Authenticating user...");
     const cognitoUser = await authenticatedUser({
       request: req as any,
       response: response as any,
     });
 
     if (!cognitoUser) {
+      console.error("❌ [Get Subscription API] Unauthorized - no cognito user");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    console.log("✅ [Get Subscription API] User authenticated:", cognitoUser.userId);
 
     // Get subscription ID from query params
     const { searchParams } = new URL(req.url);
     const subscriptionId = searchParams.get("subscriptionId");
 
+    console.log("🔍 [Get Subscription API] Subscription ID from query:", subscriptionId);
+
     if (!subscriptionId) {
+      console.error("❌ [Get Subscription API] Missing subscription ID");
       return NextResponse.json(
         { error: "Subscription ID is required" },
         { status: 400 }
@@ -34,9 +44,14 @@ export async function GET(req: Request) {
     }
 
     // Fetch subscription from Stripe with expanded fields
+    console.log("📡 [Get Subscription API] Fetching from Stripe...");
+    console.log("📡 [Get Subscription API] Stripe Secret Key present:", !!process.env.STRIPE_SECRET_KEY);
+    
     const subscription = (await stripe.subscriptions.retrieve(subscriptionId, {
       expand: ["latest_invoice", "customer"],
     })) as any;
+
+    console.log("✅ [Get Subscription API] Stripe subscription retrieved");
 
     // Period dates are in the subscription items, not at the top level
     // Get the first subscription item (most subscriptions have one item)
@@ -45,6 +60,7 @@ export async function GET(req: Request) {
     // Debug: Log subscription structure
     console.log("=== Subscription Debug ===");
     console.log("Subscription ID:", subscription.id);
+    console.log("Subscription Status:", subscription.status);
     console.log("Has items:", !!subscription.items);
     console.log("Items count:", subscription.items?.data?.length || 0);
     console.log(
@@ -114,7 +130,7 @@ export async function GET(req: Request) {
 
     // If still missing, throw an error
     if (!currentPeriodStart || !currentPeriodEnd) {
-      console.error("Missing period dates in subscription:", {
+      console.error("❌ [Get Subscription API] Missing period dates in subscription:", {
         subscription_item_current_period_start:
           subscriptionItem?.current_period_start,
         subscription_item_current_period_end:
@@ -125,7 +141,7 @@ export async function GET(req: Request) {
       throw new Error("Subscription period dates are missing");
     }
 
-    return NextResponse.json({
+    const responseData = {
       id: subscription.id,
       status: subscription.status,
       currentPeriodStart,
@@ -136,11 +152,19 @@ export async function GET(req: Request) {
       trialEnd: subscription.trial_end
         ? new Date(subscription.trial_end * 1000).toISOString()
         : null,
-    });
+    };
+
+    console.log("✅ [Get Subscription API] Returning subscription data:", responseData);
+    
+    return NextResponse.json(responseData);
   } catch (error: any) {
-    console.error("Error fetching subscription:", error);
+    console.error("❌ [Get Subscription API] Error fetching subscription:", error);
+    console.error("❌ [Get Subscription API] Error type:", error.type);
+    console.error("❌ [Get Subscription API] Error message:", error.message);
+    console.error("❌ [Get Subscription API] Error stack:", error.stack);
 
     if (error.type === "StripeInvalidRequestError") {
+      console.error("❌ [Get Subscription API] Stripe error - subscription not found");
       return NextResponse.json(
         { error: "Subscription not found" },
         { status: 404 }

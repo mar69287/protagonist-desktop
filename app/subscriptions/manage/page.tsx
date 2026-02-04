@@ -164,15 +164,31 @@ export default function ManageSubscriptionPage() {
       setError(null);
       setHasNoSubscription(false);
 
+      console.log("🔍 [Manage Page] Starting subscription fetch...");
+      console.log("🔍 [Manage Page] Auth user:", authUser);
+
       // Step 1: Fetch user from DynamoDB
+      console.log("📡 [Manage Page] Fetching user from /api/users/me...");
       const userResponse = await fetch("/api/users/me");
 
+      console.log("📡 [Manage Page] User response status:", userResponse.status);
+      
       if (!userResponse.ok) {
+        console.error("❌ [Manage Page] Failed to fetch user. Status:", userResponse.status);
+        const errorText = await userResponse.text();
+        console.error("❌ [Manage Page] Error response:", errorText);
         throw new Error("Failed to fetch user information");
       }
 
       const userData = await userResponse.json();
       const user = userData.user as User;
+      console.log("✅ [Manage Page] User data received:", {
+        userId: user.userId,
+        email: user.email,
+        stripeSubscriptionId: user.stripeSubscriptionId,
+        subscriptionStatus: user.subscriptionStatus,
+        stripeCustomerId: user.stripeCustomerId,
+      });
       setDbUser(user);
 
       // Step 2: Check if user has an active subscription or trial
@@ -181,6 +197,12 @@ export default function ManageSubscriptionPage() {
         (user.subscriptionStatus !== "active" &&
           user.subscriptionStatus !== "trialing")
       ) {
+        console.log("⚠️ [Manage Page] User has no active subscription or trial");
+        console.log("⚠️ [Manage Page] Details:", {
+          hasStripeSubId: !!user.stripeSubscriptionId,
+          subscriptionStatus: user.subscriptionStatus,
+          stripeCustomerId: user.stripeCustomerId,
+        });
         // User has no active subscription or trial
         setHasNoSubscription(true);
         setLoading(false);
@@ -188,12 +210,20 @@ export default function ManageSubscriptionPage() {
       }
 
       // Step 3: Fetch full subscription details from Stripe
-      const subscriptionResponse = await fetch(
-        `/api/subscriptions/get-subscription?subscriptionId=${user.stripeSubscriptionId}`
-      );
+      const subscriptionUrl = `/api/subscriptions/get-subscription?subscriptionId=${user.stripeSubscriptionId}`;
+      console.log("📡 [Manage Page] Fetching subscription from:", subscriptionUrl);
+      
+      const subscriptionResponse = await fetch(subscriptionUrl);
+
+      console.log("📡 [Manage Page] Subscription response status:", subscriptionResponse.status);
 
       if (!subscriptionResponse.ok) {
+        console.error("❌ [Manage Page] Failed to fetch subscription. Status:", subscriptionResponse.status);
+        const errorText = await subscriptionResponse.text();
+        console.error("❌ [Manage Page] Error response:", errorText);
+        
         if (subscriptionResponse.status === 404) {
+          console.log("⚠️ [Manage Page] Subscription not found (404)");
           setHasNoSubscription(true);
           return;
         }
@@ -201,12 +231,15 @@ export default function ManageSubscriptionPage() {
       }
 
       const subscriptionData = await subscriptionResponse.json();
+      console.log("✅ [Manage Page] Subscription data received:", subscriptionData);
       setSubscription(subscriptionData);
     } catch (err: any) {
-      console.error("Error fetching subscription:", err);
+      console.error("❌ [Manage Page] Error fetching subscription:", err);
+      console.error("❌ [Manage Page] Error stack:", err.stack);
       setError(err.message || "Failed to load subscription information");
     } finally {
       setLoading(false);
+      console.log("🏁 [Manage Page] Fetch complete");
     }
   };
 
