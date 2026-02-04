@@ -110,7 +110,8 @@ function SignupContent() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
-  const [useTrial, setUseTrial] = useState(true); // Toggle for trial option
+  const [useTrial, setUseTrial] = useState(false); // Toggle for trial option
+  const [showTrialOption, setShowTrialOption] = useState(false); // Show trial info
 
   // Fetch user data when userId is available
   useEffect(() => {
@@ -335,144 +336,159 @@ function SignupContent() {
                 transition={{ duration: 0.6 }}
                 className="text-center mb-8 sm:mb-12 md:mb-16"
               >
-                <h1
-                  style={{
-                    fontSize: "clamp(32px, 6vw, 64px)",
-                    fontWeight: 800,
-                    color: "#e0e0e0",
-                    marginBottom: "24px",
-                    lineHeight: 1.2,
-                    fontFamily: "'OggText', 'Ogg', serif",
-                  }}
-                >
-                  Put Your Money Where Your Goals Are
-                </h1>
-                <p
-                  style={{
-                    fontSize: "clamp(16px, 2vw, 20px)",
-                    color: "#b0b0b0",
-                    maxWidth: "600px",
-                    margin: "0 auto",
-                    padding: "0 16px",
-                    fontFamily:
-                      "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Monthly subscription that rewards your progress. The more you
-                  complete, the more you earn back.
-                </p>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={useTrial ? "trial-header" : "regular-header"}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.4 }}
+                  >
+                    <h1
+                      style={{
+                        fontSize: "clamp(32px, 6vw, 64px)",
+                        fontWeight: 800,
+                        color: "#e0e0e0",
+                        marginBottom: "24px",
+                        lineHeight: 1.2,
+                        fontFamily: "'OggText', 'Ogg', serif",
+                      }}
+                    >
+                      {useTrial
+                        ? "Having Second Thoughts? We Get It."
+                        : "Put Your Money Where Your Goals Are"}
+                    </h1>
+                    <p
+                      style={{
+                        fontSize: "clamp(16px, 2vw, 20px)",
+                        color: "#b0b0b0",
+                        maxWidth: "600px",
+                        margin: "0 auto",
+                        padding: "0 16px",
+                        fontFamily:
+                          "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {useTrial
+                        ? "Taking the next step in your life is a big decision. Try a smaller step with our 3-day trial."
+                        : "Monthly subscription that rewards your progress. The more you complete, the more you earn back."}
+                    </p>
+                  </motion.div>
+                </AnimatePresence>
               </motion.div>
 
-              {/* How It Works */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12 md:mb-16"
-              >
-                <NeumorphicCard centerContent>
-                  <div style={{ marginBottom: "8px" }}>
-                    <Target size={28} color="#888888" strokeWidth={1.5} />
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: "'OggText', 'Ogg', serif",
-                      fontWeight: 800,
-                      fontSize: "12px",
-                      color: "#666666",
-                      letterSpacing: "2.2px",
-                      marginBottom: "16px",
-                      marginTop: "8px",
-                      textAlign: "center",
-                    }}
-                  >
-                    SET YOUR GOAL
-                  </div>
-                  <p
-                    style={{
-                      fontFamily:
-                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                      fontSize: "16px",
-                      fontWeight: 500,
-                      color: "#b0b0b0",
-                      lineHeight: "20px",
-                      textAlign: "center",
-                    }}
-                  >
-                    Try it risk-free with a $10 trial. Complete all submissions
-                    in 3 days and get your money back!
-                  </p>
-                </NeumorphicCard>
+              {/* How It Works - Only show when NOT in trial mode */}
+              {!useTrial && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.6, delay: 0.2 }}
+                  className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12 md:mb-16"
+                >
+                  <NeumorphicCard centerContent>
+                    <div style={{ marginBottom: "8px" }}>
+                      <Target size={28} color="#888888" strokeWidth={1.5} />
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "'OggText', 'Ogg', serif",
+                        fontWeight: 800,
+                        fontSize: "12px",
+                        color: "#666666",
+                        letterSpacing: "2.2px",
+                        marginBottom: "16px",
+                        marginTop: "8px",
+                        textAlign: "center",
+                      }}
+                    >
+                      SET YOUR GOAL
+                    </div>
+                    <p
+                      style={{
+                        fontFamily:
+                          "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                        fontSize: "16px",
+                        fontWeight: 500,
+                        color: "#b0b0b0",
+                        lineHeight: "20px",
+                        textAlign: "center",
+                      }}
+                    >
+                      Define your personal goals and commit to achieving them with real accountability.
+                    </p>
+                  </NeumorphicCard>
 
-                <NeumorphicCard centerContent>
-                  <div style={{ marginBottom: "8px" }}>
-                    <TrendingUp size={28} color="#888888" strokeWidth={1.5} />
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: "'OggText', 'Ogg', serif",
-                      fontWeight: 800,
-                      fontSize: "12px",
-                      color: "#666666",
-                      letterSpacing: "2.2px",
-                      marginBottom: "16px",
-                      marginTop: "8px",
-                      textAlign: "center",
-                    }}
-                  >
-                    TRACK PROGRESS
-                  </div>
-                  <p
-                    style={{
-                      fontFamily:
-                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                      fontSize: "16px",
-                      fontWeight: 500,
-                      color: "#b0b0b0",
-                      lineHeight: "20px",
-                      textAlign: "center",
-                    }}
-                  >
-                    Complete tasks and milestones toward your goal. Every step
-                    counts.
-                  </p>
-                </NeumorphicCard>
+                  <NeumorphicCard centerContent>
+                    <div style={{ marginBottom: "8px" }}>
+                      <TrendingUp size={28} color="#888888" strokeWidth={1.5} />
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "'OggText', 'Ogg', serif",
+                        fontWeight: 800,
+                        fontSize: "12px",
+                        color: "#666666",
+                        letterSpacing: "2.2px",
+                        marginBottom: "16px",
+                        marginTop: "8px",
+                        textAlign: "center",
+                      }}
+                    >
+                      TRACK PROGRESS
+                    </div>
+                    <p
+                      style={{
+                        fontFamily:
+                          "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                        fontSize: "16px",
+                        fontWeight: 500,
+                        color: "#b0b0b0",
+                        lineHeight: "20px",
+                        textAlign: "center",
+                      }}
+                    >
+                      Complete tasks and milestones toward your goal. Every step
+                      counts.
+                    </p>
+                  </NeumorphicCard>
 
-                <NeumorphicCard centerContent>
-                  <div style={{ marginBottom: "8px" }}>
-                    <DollarSign size={28} color="#888888" strokeWidth={1.5} />
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: "'OggText', 'Ogg', serif",
-                      fontWeight: 800,
-                      fontSize: "12px",
-                      color: "#666666",
-                      letterSpacing: "2.2px",
-                      marginBottom: "16px",
-                      marginTop: "8px",
-                      textAlign: "center",
-                    }}
-                  >
-                    EARN MONEY BACK
-                  </div>
-                  <p
-                    style={{
-                      fontFamily:
-                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                      fontSize: "16px",
-                      fontWeight: 500,
-                      color: "#b0b0b0",
-                      lineHeight: "20px",
-                      textAlign: "center",
-                    }}
-                  >
-                    The more you achieve, the more you earn back. Hit 90%+ for
-                    maximum rewards.
-                  </p>
-                </NeumorphicCard>
-              </motion.div>
+                  <NeumorphicCard centerContent>
+                    <div style={{ marginBottom: "8px" }}>
+                      <DollarSign size={28} color="#888888" strokeWidth={1.5} />
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "'OggText', 'Ogg', serif",
+                        fontWeight: 800,
+                        fontSize: "12px",
+                        color: "#666666",
+                        letterSpacing: "2.2px",
+                        marginBottom: "16px",
+                        marginTop: "8px",
+                        textAlign: "center",
+                      }}
+                    >
+                      EARN MONEY BACK
+                    </div>
+                    <p
+                      style={{
+                        fontFamily:
+                          "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                        fontSize: "16px",
+                        fontWeight: 500,
+                        color: "#b0b0b0",
+                        lineHeight: "20px",
+                        textAlign: "center",
+                      }}
+                    >
+                      The more you achieve, the more you earn back. Hit 90%+ for
+                      maximum rewards.
+                    </p>
+                  </NeumorphicCard>
+                </motion.div>
+              )}
 
               {/* Main Commitment Plan */}
               <motion.div
@@ -504,87 +520,8 @@ function SignupContent() {
                       </span>
                     </div>
 
-                    {/* Trial Toggle Options */}
+                    {/* Pricing Display */}
                     <div className="mb-6 sm:mb-8 mt-4 sm:mt-4">
-                      {/* Compact Toggle Buttons */}
-                      <div
-                        style={{
-                          display: "inline-flex",
-                          backgroundColor: "rgba(0, 0, 0, 0.3)",
-                          borderRadius: "12px",
-                          padding: "4px",
-                          border: "1px solid rgba(255, 255, 255, 0.08)",
-                          margin: "0 auto 20px",
-                          width: "100%",
-                          maxWidth: "400px",
-                        }}
-                      >
-                        {/* With Trial Option */}
-                        <button
-                          onClick={() => setUseTrial(true)}
-                          style={{
-                            flex: 1,
-                            padding: "10px 16px",
-                            borderRadius: "8px",
-                            border: "none",
-                            backgroundColor: useTrial
-                              ? "#888888"
-                              : "transparent",
-                            color: useTrial ? "#1a1a1a" : "#888888",
-                            cursor: "pointer",
-                            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            fontFamily:
-                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                            position: "relative",
-                          }}
-                        >
-                          <div style={{ position: "relative", zIndex: 1 }}>
-                            $10 Trial
-                            {useTrial && (
-                              <span
-                                style={{
-                                  display: "block",
-                                  fontSize: "10px",
-                                  opacity: 0.7,
-                                  marginTop: "2px",
-                                }}
-                              >
-                                Recommended
-                              </span>
-                            )}
-                          </div>
-                        </button>
-
-                        {/* Without Trial Option */}
-                        <button
-                          onClick={() => setUseTrial(false)}
-                          style={{
-                            flex: 1,
-                            padding: "10px 16px",
-                            borderRadius: "8px",
-                            border: "none",
-                            backgroundColor: !useTrial
-                              ? "#888888"
-                              : "transparent",
-                            color: !useTrial ? "#1a1a1a" : "#888888",
-                            cursor: "pointer",
-                            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            fontFamily:
-                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                            position: "relative",
-                          }}
-                        >
-                          <div style={{ position: "relative", zIndex: 1 }}>
-                            $98/month
-                          </div>
-                        </button>
-                      </div>
-
-                      {/* Selected Plan Details with Animation */}
                       <AnimatePresence mode="wait">
                         <motion.div
                           key={useTrial ? "trial" : "no-trial"}
@@ -618,18 +555,7 @@ function SignupContent() {
                                   today
                                 </span>
                               </div>
-                              <p
-                                style={{
-                                  color: "#22c55e",
-                                  fontSize: "14px",
-                                  marginBottom: "4px",
-                                  fontWeight: 600,
-                                  fontFamily:
-                                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                                }}
-                              >
-                                Complete all proofs in 3 days → Get $10 back!
-                              </p>
+
                               <p
                                 style={{
                                   color: "#888888",
@@ -684,7 +610,7 @@ function SignupContent() {
                                     "'Helvetica Neue', -apple-system, system-ui, sans-serif",
                                 }}
                               >
-                                Billed monthly at $98
+                                Earn back based on your completion rate
                               </p>
                             </>
                           )}
@@ -692,9 +618,12 @@ function SignupContent() {
                       </AnimatePresence>
                     </div>
 
-                    {/* Trial Period Refund (if trial selected) */}
-                    {useTrial && (
-                      <div
+                    {/* Trial Period Refund (if trial selected and shown) */}
+                    {useTrial && showTrialOption && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        transition={{ duration: 0.4 }}
                         style={{
                           backgroundColor: "rgba(34, 197, 94, 0.1)",
                           borderRadius: "16px",
@@ -725,8 +654,8 @@ function SignupContent() {
                               "'Helvetica Neue', -apple-system, system-ui, sans-serif",
                           }}
                         >
-                          Complete all your submission proofs within the 3-day
-                          trial period and get your full $10 back!
+                          Complete all required proofs within the 3-day
+                          trial period and get your full $10 back.
                         </p>
                         <div
                           style={{
@@ -752,194 +681,192 @@ function SignupContent() {
                             100% completion in trial = Full $10 refund
                           </span>
                         </div>
-                      </div>
+                      </motion.div>
                     )}
 
-                    {/* First Month Refund Structure */}
-                    <div
-                      style={{
-                        backgroundColor: "rgba(0,0,0,0.3)",
-                        borderRadius: "16px",
-                        padding: "24px",
-                        marginBottom: "32px",
-                        border: "1px solid rgba(255, 255, 255, 0.05)",
-                      }}
-                    >
-                      <h4
+                    {/* First Month Refund Structure - Only show when NOT in trial mode */}
+                    {!useTrial && (
+                      <div
                         style={{
-                          fontSize: "16px",
-                          fontWeight: 800,
-                          color: "#b0b0b0",
-                          marginBottom: "8px",
-                          textAlign: "center",
-                          fontFamily: "'OggText', 'Ogg', serif",
+                          backgroundColor: "rgba(0,0,0,0.3)",
+                          borderRadius: "16px",
+                          padding: "24px",
+                          marginBottom: "32px",
+                          border: "1px solid rgba(255, 255, 255, 0.05)",
                         }}
                       >
-                        {useTrial
-                          ? "After Trial: Monthly Earnings"
-                          : "First Month Earnings"}
-                      </h4>
-                      <p
-                        style={{
-                          fontSize: "13px",
-                          color: "#888888",
-                          marginBottom: "16px",
-                          textAlign: "center",
-                          fontFamily:
-                            "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                        }}
-                      >
-                        {useTrial
-                          ? "Based on your completion rate during the full 30-day period"
-                          : "Based on your completion rate during the first 30 days"}
-                      </p>
-                      <div className="space-y-3 sm:space-y-4">
-                        <div
+                        <h4
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "12px 16px",
-                            borderRadius: "12px",
-                            backgroundColor: "rgba(0,0,0,0.2)",
+                            fontSize: "16px",
+                            fontWeight: 800,
+                            color: "#b0b0b0",
+                            marginBottom: "8px",
+                            textAlign: "center",
+                            fontFamily: "'OggText', 'Ogg', serif",
                           }}
                         >
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500 shrink-0"></div>
+                          First Month Earnings
+                        </h4>
+                        <p
+                          style={{
+                            fontSize: "13px",
+                            color: "#888888",
+                            marginBottom: "16px",
+                            textAlign: "center",
+                            fontFamily:
+                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                          }}
+                        >
+                          Based on your completion rate during the first 30 days
+                        </p>
+                        <div className="space-y-3 sm:space-y-4">
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "12px 16px",
+                              borderRadius: "12px",
+                              backgroundColor: "rgba(0,0,0,0.2)",
+                              border: "1px solid rgba(34, 197, 94, 0.2)",
+                            }}
+                          >
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 shrink-0"></div>
+                              <span
+                                style={{
+                                  color: "#888888",
+                                  fontSize: "14px",
+                                  fontFamily:
+                                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                                }}
+                              >
+                                90%+
+                              </span>
+                            </div>
                             <span
                               style={{
-                                color: "#888888",
+                                color: "#22c55e",
+                                fontWeight: 600,
                                 fontSize: "14px",
                                 fontFamily:
                                   "'Helvetica Neue', -apple-system, system-ui, sans-serif",
                               }}
                             >
-                              Below 50%
+                              All back ($98)
                             </span>
                           </div>
-                          <span
-                            style={{
-                              color: "#b0b0b0",
-                              fontWeight: 600,
-                              fontSize: "14px",
-                              fontFamily:
-                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                            }}
-                          >
-                            $0 back
-                          </span>
-                        </div>
 
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "12px 16px",
-                            borderRadius: "12px",
-                            backgroundColor: "rgba(0,0,0,0.2)",
-                          }}
-                        >
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-orange-500 shrink-0"></div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "12px 16px",
+                              borderRadius: "12px",
+                              backgroundColor: "rgba(0,0,0,0.2)",
+                            }}
+                          >
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-yellow-500 shrink-0"></div>
+                              <span
+                                style={{
+                                  color: "#888888",
+                                  fontSize: "14px",
+                                  fontFamily:
+                                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                                }}
+                              >
+                                70-89%
+                              </span>
+                            </div>
                             <span
                               style={{
-                                color: "#888888",
+                                color: "#b0b0b0",
+                                fontWeight: 600,
                                 fontSize: "14px",
                                 fontFamily:
                                   "'Helvetica Neue', -apple-system, system-ui, sans-serif",
                               }}
                             >
-                              50-69%
+                              $49 back
                             </span>
                           </div>
-                          <span
-                            style={{
-                              color: "#b0b0b0",
-                              fontWeight: 600,
-                              fontSize: "14px",
-                              fontFamily:
-                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                            }}
-                          >
-                            $30 back
-                          </span>
-                        </div>
 
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "12px 16px",
-                            borderRadius: "12px",
-                            backgroundColor: "rgba(0,0,0,0.2)",
-                          }}
-                        >
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-yellow-500 shrink-0"></div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "12px 16px",
+                              borderRadius: "12px",
+                              backgroundColor: "rgba(0,0,0,0.2)",
+                            }}
+                          >
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-orange-500 shrink-0"></div>
+                              <span
+                                style={{
+                                  color: "#888888",
+                                  fontSize: "14px",
+                                  fontFamily:
+                                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                                }}
+                              >
+                                50-69%
+                              </span>
+                            </div>
                             <span
                               style={{
-                                color: "#888888",
+                                color: "#b0b0b0",
+                                fontWeight: 600,
                                 fontSize: "14px",
                                 fontFamily:
                                   "'Helvetica Neue', -apple-system, system-ui, sans-serif",
                               }}
                             >
-                              70-89%
+                              $30 back
                             </span>
                           </div>
-                          <span
-                            style={{
-                              color: "#b0b0b0",
-                              fontWeight: 600,
-                              fontSize: "14px",
-                              fontFamily:
-                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                            }}
-                          >
-                            $49 back
-                          </span>
-                        </div>
 
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "12px 16px",
-                            borderRadius: "12px",
-                            backgroundColor: "rgba(0,0,0,0.2)",
-                            border: "1px solid rgba(34, 197, 94, 0.2)",
-                          }}
-                        >
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 shrink-0"></div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "12px 16px",
+                              borderRadius: "12px",
+                              backgroundColor: "rgba(0,0,0,0.2)",
+                            }}
+                          >
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500 shrink-0"></div>
+                              <span
+                                style={{
+                                  color: "#888888",
+                                  fontSize: "14px",
+                                  fontFamily:
+                                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                                }}
+                              >
+                                Below 50%
+                              </span>
+                            </div>
                             <span
                               style={{
-                                color: "#888888",
+                                color: "#b0b0b0",
+                                fontWeight: 600,
                                 fontSize: "14px",
                                 fontFamily:
                                   "'Helvetica Neue', -apple-system, system-ui, sans-serif",
                               }}
                             >
-                              90%+
+                              $0 back
                             </span>
                           </div>
-                          <span
-                            style={{
-                              color: "#22c55e",
-                              fontWeight: 600,
-                              fontSize: "14px",
-                              fontFamily:
-                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                            }}
-                          >
-                            All back ($98)
-                          </span>
                         </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Following Months - COMMENTED OUT */}
                     {/* <div
@@ -1165,8 +1092,8 @@ function SignupContent() {
                           className="group-hover:text-[#b0b0b0] transition-colors"
                         >
                           {useTrial
-                            ? "I understand this starts with a $10 3-day trial, then becomes a $98/month subscription. I can get my $10 back by completing all submission proofs during the trial. I commit to tracking my progress honestly and understand that refunds are based on verified completion percentages. I can cancel anytime."
-                            : "I understand this is a $98/month subscription. I commit to tracking my progress honestly and understand that refunds are based on verified completion percentages. I can cancel anytime."}
+                            ? "I understand this starts with a $10 3-day trial, then becomes a $98/month subscription. I understand that refunds are based on verified completion percentages. I can cancel anytime."
+                            : "I understand that refunds are based on verified completion percentages. I can cancel anytime."}
                         </span>
                       </div>
                     </div>
@@ -1218,6 +1145,71 @@ function SignupContent() {
                         ? "Commit to My Goal"
                         : "Please agree to terms"}
                     </motion.button>
+
+                    {/* Not Ready Yet Button / Switch Back Button */}
+                    {!useTrial ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="mt-6 text-center"
+                      >
+                        <button
+                          onClick={() => {
+                            setUseTrial(true);
+                            setShowTrialOption(true);
+                            setAgreedToTerms(false); // Reset agreement when switching
+                          }}
+                          style={{
+                            color: "#888888",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            fontFamily:
+                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            textDecoration: "underline",
+                            transition: "color 0.2s ease",
+                            cursor: "pointer",
+                            background: "none",
+                            border: "none",
+                            padding: "8px",
+                          }}
+                          className="hover:text-[#b0b0b0]"
+                        >
+                          Not ready yet? Try our 3-day trial for $10
+                        </button>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="mt-6 text-center"
+                      >
+                        <button
+                          onClick={() => {
+                            setUseTrial(false);
+                            setShowTrialOption(false);
+                            setAgreedToTerms(false); // Reset agreement when switching
+                          }}
+                          style={{
+                            color: "#888888",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            fontFamily:
+                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            textDecoration: "underline",
+                            transition: "color 0.2s ease",
+                            cursor: "pointer",
+                            background: "none",
+                            border: "none",
+                            padding: "8px",
+                          }}
+                          className="hover:text-[#b0b0b0]"
+                        >
+                          Ready to commit? Switch to full monthly plan
+                        </button>
+                      </motion.div>
+                    )}
                   </NeumorphicCard>
                 </div>
               </motion.div>
