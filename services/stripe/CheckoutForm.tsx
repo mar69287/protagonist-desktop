@@ -16,9 +16,14 @@ const stripePromise = loadStripe(
 interface CheckoutFormProps {
   userId: string;
   email?: string;
+  useTrial?: boolean;
 }
 
-export default function CheckoutForm({ userId, email }: CheckoutFormProps) {
+export default function CheckoutForm({
+  userId,
+  email,
+  useTrial = true,
+}: CheckoutFormProps) {
   const fetchClientSecret = useCallback(async () => {
     // Call your API to create a checkout session
     // Now using Stripe Price ID from product catalog
@@ -27,12 +32,12 @@ export default function CheckoutForm({ userId, email }: CheckoutFormProps) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ userId, email }),
+      body: JSON.stringify({ userId, email, useTrial }),
     });
 
     const data = await response.json();
     return data.clientSecret;
-  }, [userId, email]);
+  }, [userId, email, useTrial]);
 
   const options = {
     fetchClientSecret,

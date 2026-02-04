@@ -133,6 +133,9 @@ export async function GET(req: Request) {
       cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
       amount: subscription.items.data[0]?.price.unit_amount || 0,
       currency: subscription.items.data[0]?.price.currency || "usd",
+      trialEnd: subscription.trial_end
+        ? new Date(subscription.trial_end * 1000).toISOString()
+        : null,
     });
   } catch (error: any) {
     console.error("Error fetching subscription:", error);

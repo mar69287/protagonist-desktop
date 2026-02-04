@@ -13,12 +13,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { userId, subscriptionId, paymentId, action } = body;
 
-    if (action !== "pre_billing_check") {
+    if (action !== "pre_billing_check" && action !== "trial_refund_check") {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
+    const isTrialCheck = action === "trial_refund_check";
+
     console.log(
-      `Processing pre-billing check for user ${userId}, payment ${paymentId}`
+      `Processing ${
+        isTrialCheck ? "trial refund" : "pre-billing"
+      } check for user ${userId}, payment ${paymentId}`
     );
 
     // Get the user from DynamoDB
@@ -74,16 +78,18 @@ export async function POST(request: NextRequest) {
       `Found challenge: ${currentChallenge.challengeId}, created: ${currentChallenge.createdAt}, status: ${currentChallenge.status}`
     );
 
-    // Billing period boundaries
+    // Determine period boundaries
+    // For trial users, currentPeriodEnd is the trial end date
+    // For active users, currentPeriodEnd is the billing period end date
     const subscriptionStart = new Date(user.currentPeriodStart);
     const subscriptionEnd = new Date(user.currentPeriodEnd);
-    const checkTime = new Date(subscriptionEnd.getTime() - 3600000); // 1 hour before end (for deadline check)
+    const checkTime = new Date(subscriptionEnd.getTime() - 3600000); // 1 hour before end
     const now = new Date();
 
     console.log(
-      `Checking billing period: ${
-        user.currentPeriodStart
-      } to ${subscriptionEnd.toISOString()} (checking at ${checkTime.toISOString()})`
+      `Checking ${
+        isTrialCheck ? "TRIAL" : "billing"
+      } period: ${subscriptionStart.toISOString()} to ${subscriptionEnd.toISOString()} (checking at ${checkTime.toISOString()})`
     );
 
     // Check if current challenge started before or after the billing period started
@@ -244,48 +250,60 @@ export async function POST(request: NextRequest) {
     }, {} as Record<string, number>);
     console.log(`  Status breakdown:`, statusBreakdown);
 
-    // Check if this is the user's first billing cycle
-    // Query all challenges to see if only one exists
-    const allUserChallengesResult = await dynamoDb.send(
-      new QueryCommand({
-        TableName: TableNames.CHALLENGES,
-        IndexName: "userId-createdAt-index",
-        KeyConditionExpression: "userId = :userId",
-        ExpressionAttributeValues: {
-          ":userId": userId,
-        },
-        ScanIndexForward: true,
-      })
-    );
+    // Check if this is the user's first billing cycle (not applicable for trial checks)
+    let isFirstBillingCycle = false;
 
-    const allUserChallenges = allUserChallengesResult.Items || [];
-    const isFirstBillingCycle = allUserChallenges.length <= 1;
+    if (!isTrialCheck) {
+      const allUserChallengesResult = await dynamoDb.send(
+        new QueryCommand({
+          TableName: TableNames.CHALLENGES,
+          IndexName: "userId-createdAt-index",
+          KeyConditionExpression: "userId = :userId",
+          ExpressionAttributeValues: {
+            ":userId": userId,
+          },
+          ScanIndexForward: true,
+        })
+      );
+
+      const allUserChallenges = allUserChallengesResult.Items || [];
+      isFirstBillingCycle = allUserChallenges.length <= 1;
+
+      console.log(
+        `GSI Query returned ${allUserChallenges.length} challenge(s):`,
+        allUserChallenges.map((c) => ({
+          challengeId: c.challengeId,
+          createdAt: c.createdAt,
+        }))
+      );
+      console.log(
+        `First billing cycle: ${isFirstBillingCycle} (user has ${allUserChallenges.length} total challenge(s))`
+      );
+    }
+
+    // Calculate refund based on submissionCalendar completed count
+    const refundCalculation = isTrialCheck
+      ? calculateTrialRefund(allRelevantSubmissions.length, completedCount)
+      : calculateRefundFromSubmissions(
+          allRelevantSubmissions.length,
+          completedCount,
+          isFirstBillingCycle
+        );
 
     console.log(
-      `GSI Query returned ${allUserChallenges.length} challenge(s):`,
-      allUserChallenges.map((c) => ({
-        challengeId: c.challengeId,
-        createdAt: c.createdAt,
-      }))
+      `${isTrialCheck ? "Trial" : "Billing"} refund calculation for user ${userId}:`,
+      refundCalculation
     );
-    console.log(
-      `First billing cycle: ${isFirstBillingCycle} (user has ${allUserChallenges.length} total challenge(s))`
-    );
-
-    // Calculate refund based on submissionCalendar completed count (verified + denied)
-    const refundCalculation = calculateRefundFromSubmissions(
-      allRelevantSubmissions.length,
-      completedCount,
-      isFirstBillingCycle
-    );
-
-    console.log(`Refund calculation for user ${userId}:`, refundCalculation);
 
     // Mark all submissions that were included in this refund check
     // This prevents double-counting in future billing periods
-    const currentPeriodId = `${checkTime.getUTCFullYear()}-${String(
-      checkTime.getUTCMonth() + 1
-    ).padStart(2, "0")}`;
+    const currentPeriodId = isTrialCheck
+      ? `trial-${checkTime.getUTCFullYear()}-${String(
+          checkTime.getUTCMonth() + 1
+        ).padStart(2, "0")}`
+      : `${checkTime.getUTCFullYear()}-${String(
+          checkTime.getUTCMonth() + 1
+        ).padStart(2, "0")}`;
 
     console.log(
       `Marking ${allRelevantSubmissions.length} submissions as checked for period ${currentPeriodId}`
@@ -327,7 +345,7 @@ export async function POST(request: NextRequest) {
 
     // If refund is needed, process it
     if (refundCalculation.refundAmount > 0) {
-      await processRefund(paymentId, refundCalculation);
+      await processRefund(paymentId, refundCalculation, isFirstBillingCycle);
     } else {
       console.log(`No refund needed for user ${userId}`);
       // Create a payment history record for the "no refund" decision
@@ -367,6 +385,52 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * Calculate refund for trial period (max $10)
+ *
+ * Trial period is typically 3 days, and user has already paid $10.
+ * This is an all-or-nothing test to prove commitment during the trial.
+ *
+ * Refund structure:
+ * - 100% completion: Full $10 refund
+ * - <100%: No refund
+ */
+function calculateTrialRefund(
+  totalExpected: number,
+  verifiedCount: number
+): {
+  totalExpected: number;
+  successfulSubmissions: number;
+  missedSubmissions: number;
+  completionRate: number;
+  refundAmount: number;
+  isFirstBillingCycle: boolean;
+} {
+  const missedSubmissions = totalExpected - verifiedCount;
+
+  // Calculate completion rate
+  const completionRate =
+    totalExpected > 0 ? (verifiedCount / totalExpected) * 100 : 0;
+
+  // All-or-nothing: Only 100% completion gets refund
+  const refundAmount = completionRate === 100 ? 10 : 0;
+
+  console.log(
+    `Trial Completion: ${completionRate.toFixed(
+      2
+    )}% (${verifiedCount}/${totalExpected}) - Refund: $${refundAmount}`
+  );
+
+  return {
+    totalExpected,
+    successfulSubmissions: verifiedCount,
+    missedSubmissions,
+    completionRate,
+    refundAmount,
+    isFirstBillingCycle: false, // Not applicable for trial
+  };
+}
+
+/**
  * Calculate refund based on submission completion rate
  *
  * Calculation:
@@ -376,11 +440,11 @@ export async function POST(request: NextRequest) {
  *
  * Note: "denied" submissions count as expected but NOT successful
  *
- * First Billing Cycle:
- * - 90%+ completion: $98 refund
- * - 70-89% completion: $49 refund
- * - 50-69% completion: $30 refund
- * - <50%: No refund
+ * First Billing Cycle (includes $10 bonus for all users):
+ * - 90%+ completion: $108 refund ($98 + $10 bonus)
+ * - 70-89% completion: $59 refund ($49 + $10 bonus)
+ * - 50-69% completion: $40 refund ($30 + $10 bonus)
+ * - <50%: $10 refund (bonus only)
  *
  * Subsequent Billing Cycles:
  * - 90%+ completion: $50 refund
@@ -409,15 +473,15 @@ function calculateRefundFromSubmissions(
   let refundAmount = 0;
 
   if (isFirstBillingCycle) {
-    // First billing cycle refund logic
+    // First billing cycle refund logic (with $10 bonus for all users)
     if (completionRate >= 90) {
-      refundAmount = 98;
+      refundAmount = 98 + 10; // $108 total
     } else if (completionRate >= 70) {
-      refundAmount = 49;
+      refundAmount = 49 + 10; // $59 total
     } else if (completionRate >= 50) {
-      refundAmount = 30;
+      refundAmount = 30 + 10; // $40 total
     } else {
-      refundAmount = 0; // No refund
+      refundAmount = 10; // $10 bonus even if below threshold
     }
   } else {
     // Subsequent billing cycles refund logic
@@ -456,7 +520,8 @@ async function processRefund(
     successfulSubmissions: number;
     totalExpected: number;
     completionRate: number;
-  }
+  },
+  isFirstBillingCycle: boolean
 ): Promise<void> {
   try {
     // Get the payment record directly by ID
@@ -481,12 +546,22 @@ async function processRefund(
       );
       return;
     }
-    const refundAmount = refundCalculation.refundAmount;
+    const originalCalculatedRefund = refundCalculation.refundAmount;
+    let refundAmount = refundCalculation.refundAmount;
+    const originalPaymentAmount = payment.amount;
+
+    // Cap refund at original payment amount (Stripe limitation)
+    // If calculated refund exceeds payment, user gets full refund + we log the bonus
+    const wasCapped = refundAmount > originalPaymentAmount;
+    if (wasCapped) {
+      console.log(
+        `⚠️ Calculated refund ($${refundAmount}) exceeds original payment ($${originalPaymentAmount}). Capping at $${originalPaymentAmount}.`
+      );
+      refundAmount = originalPaymentAmount;
+    }
 
     console.log(
-      `Processing refund: Original payment: $${
-        payment.amount
-      }, Refund: $${refundAmount} (${refundCalculation.completionRate.toFixed(
+      `Processing refund: Original payment: $${originalPaymentAmount}, Refund: $${refundAmount} (${refundCalculation.completionRate.toFixed(
         2
       )}% completion)`
     );
@@ -497,66 +572,70 @@ async function processRefund(
       return;
     }
 
-    // Get PaymentIntent ID from payment record or invoice
+    // Get invoice to find customer ID (needed for refund and potential bonus)
+    let customerId: string | null = null;
     let paymentIntentId = payment.stripePaymentIntentId;
 
-    // If not stored, retrieve from invoice by expanding payment_intent
-    if (!paymentIntentId) {
+    // Retrieve invoice to get customer ID
+    try {
+      const invoice = await stripe.invoices.retrieve(payment.stripeInvoiceId);
+      customerId =
+        typeof invoice.customer === "string"
+          ? invoice.customer
+          : invoice.customer?.id || null;
+
+      if (!customerId) {
+        console.error("No customer ID found on invoice");
+      }
+    } catch (error) {
+      console.error("Error retrieving invoice:", error);
+    }
+
+    // If not stored, retrieve PaymentIntent from customer
+    if (!paymentIntentId && customerId) {
       console.log(
         `Retrieving PaymentIntent from invoice: ${payment.stripeInvoiceId}`
       );
 
       try {
-        // Get the invoice to find the customer
-        const invoice = await stripe.invoices.retrieve(payment.stripeInvoiceId);
-        const customerId =
-          typeof invoice.customer === "string"
-            ? invoice.customer
-            : invoice.customer?.id;
+        // List PaymentIntents for this customer
+        const paymentIntents = await stripe.paymentIntents.list({
+          customer: customerId,
+          limit: 10,
+        });
 
-        if (!customerId) {
-          console.error("No customer ID found on invoice");
+        console.log(
+          `Found ${paymentIntents.data.length} PaymentIntents for customer`
+        );
+
+        // Get invoice amount for matching
+        const invoice = await stripe.invoices.retrieve(payment.stripeInvoiceId);
+        const invoiceAmount = invoice.amount_paid;
+
+        // Find PaymentIntent that matches the invoice amount
+        const matchingPI = paymentIntents.data.find((pi) => {
+          const piAmount = pi.amount;
+          const amountMatches = piAmount === invoiceAmount;
+
+          console.log(
+            `  Checking PI ${pi.id}: amount=${piAmount}, invoice amount=${invoiceAmount}, match=${amountMatches}`
+          );
+
+          return amountMatches && pi.status === "succeeded";
+        });
+
+        if (matchingPI) {
+          paymentIntentId = matchingPI.id;
+          console.log(`✅ Found matching PaymentIntent: ${paymentIntentId}`);
         } else {
           console.log(
-            `Searching PaymentIntents for customer ${customerId}, amount: ${invoice.amount_paid}`
+            `No matching PaymentIntent found for invoice ${payment.stripeInvoiceId}`
           );
-
-          // List PaymentIntents for this customer
-          const paymentIntents = await stripe.paymentIntents.list({
-            customer: customerId,
-            limit: 10,
-          });
-
-          console.log(
-            `Found ${paymentIntents.data.length} PaymentIntents for customer`
-          );
-
-          // Find PaymentIntent that matches the invoice amount
-          const matchingPI = paymentIntents.data.find((pi) => {
-            const piAmount = pi.amount;
-            const invoiceAmount = invoice.amount_paid;
-            const amountMatches = piAmount === invoiceAmount;
-
-            console.log(
-              `  Checking PI ${pi.id}: amount=${piAmount}, invoice amount=${invoiceAmount}, match=${amountMatches}`
-            );
-
-            return amountMatches && pi.status === "succeeded";
-          });
-
-          if (matchingPI) {
-            paymentIntentId = matchingPI.id;
-            console.log(`✅ Found matching PaymentIntent: ${paymentIntentId}`);
-          } else {
-            console.log(
-              `No matching PaymentIntent found for invoice ${payment.stripeInvoiceId}`
-            );
-          }
         }
       } catch (error) {
         console.error("Error finding PaymentIntent:", error);
       }
-    } else {
+    } else if (paymentIntentId) {
       console.log(`Using stored PaymentIntent: ${paymentIntentId}`);
     }
 
@@ -615,6 +694,55 @@ async function processRefund(
     console.log(
       `Refund recorded in payment history for user ${payment.userId}`
     );
+
+    // If refund was capped and it's first billing cycle, send extra $10 bonus
+    if (wasCapped && isFirstBillingCycle && customerId) {
+      const bonusAmount = 10;
+      console.log(
+        `🎁 Sending $${bonusAmount} bonus to customer ${customerId} (refund was capped)`
+      );
+
+      try {
+        // Add $10 credit to customer's balance using Customer Balance Transactions API
+        // Negative amount = credit (money going to customer), positive = charge
+        // This credit will automatically apply to their next invoice or they can request a payout
+        await stripe.customers.createBalanceTransaction(customerId, {
+          amount: -Math.round(bonusAmount * 100), // Negative for credit (convert to cents)
+          currency: "usd",
+          description: `First billing cycle bonus - refund was capped`,
+        });
+
+        console.log(
+          `✅ $${bonusAmount} bonus added to customer ${customerId} balance`
+        );
+
+        // Record the bonus in payment history for audit trail
+        await dynamoDb.send(
+          new PutCommand({
+            TableName: TableNames.PAYMENT_HISTORY,
+            Item: {
+              paymentId: `bonus-${payment.userId}-${Date.now()}`,
+              userId: payment.userId,
+              subscriptionId: payment.subscriptionId,
+              type: "refund",
+              amount: bonusAmount,
+              status: "succeeded",
+              stripeInvoiceId: payment.stripeInvoiceId,
+              stripePaymentIntentId: paymentIntentId,
+              stripeChargeId: null,
+              refundReason: `First billing cycle bonus: Extra $${bonusAmount} (refund was capped at $${originalPaymentAmount}, calculated was $${originalCalculatedRefund})`,
+              createdAt: new Date().toISOString(),
+            },
+          })
+        );
+      } catch (error) {
+        console.error(
+          `Error sending $${bonusAmount} bonus to customer ${customerId}:`,
+          error
+        );
+        // Don't throw - we don't want to fail the refund if bonus fails
+      }
+    }
   } catch (error) {
     console.error("Error processing refund:", error);
     throw error;

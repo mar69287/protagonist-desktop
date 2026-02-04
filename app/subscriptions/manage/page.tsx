@@ -105,7 +105,13 @@ interface User {
   isAdmin?: boolean;
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
-  subscriptionStatus?: "active" | "canceled" | "past_due" | "unpaid" | null;
+  subscriptionStatus?:
+    | "active"
+    | "canceled"
+    | "past_due"
+    | "unpaid"
+    | "trialing"
+    | null;
   currentPeriodStart?: string | null;
   currentPeriodEnd?: string | null;
   cancelAtPeriodEnd?: boolean;
@@ -129,6 +135,7 @@ interface Subscription {
   cancelAtPeriodEnd: boolean;
   amount: number;
   currency: string;
+  trialEnd?: string | null;
 }
 
 export default function ManageSubscriptionPage() {
@@ -168,9 +175,13 @@ export default function ManageSubscriptionPage() {
       const user = userData.user as User;
       setDbUser(user);
 
-      // Step 2: Check if user has an active subscription
-      if (!user.stripeSubscriptionId || user.subscriptionStatus !== "active") {
-        // User has no active subscription
+      // Step 2: Check if user has an active subscription or trial
+      if (
+        !user.stripeSubscriptionId ||
+        (user.subscriptionStatus !== "active" &&
+          user.subscriptionStatus !== "trialing")
+      ) {
+        // User has no active subscription or trial
         setHasNoSubscription(true);
         setLoading(false);
         return;
@@ -442,22 +453,31 @@ export default function ManageSubscriptionPage() {
                 <div className="flex items-start gap-4">
                   <div
                     style={{
-                      backgroundColor: subscription.cancelAtPeriodEnd
-                        ? "rgba(239, 68, 68, 0.15)"
-                        : "rgba(34, 197, 94, 0.15)",
+                      backgroundColor:
+                        subscription.status === "trialing"
+                          ? "rgba(136, 136, 136, 0.15)"
+                          : subscription.cancelAtPeriodEnd
+                          ? "rgba(239, 68, 68, 0.15)"
+                          : "rgba(34, 197, 94, 0.15)",
                       borderRadius: "50%",
                       padding: "12px",
-                      border: subscription.cancelAtPeriodEnd
-                        ? "1px solid rgba(239, 68, 68, 0.3)"
-                        : "1px solid rgba(34, 197, 94, 0.3)",
+                      border:
+                        subscription.status === "trialing"
+                          ? "1px solid rgba(136, 136, 136, 0.3)"
+                          : subscription.cancelAtPeriodEnd
+                          ? "1px solid rgba(239, 68, 68, 0.3)"
+                          : "1px solid rgba(34, 197, 94, 0.3)",
                     }}
                   >
                     <CreditCard
                       className="w-6 h-6"
                       style={{
-                        color: subscription.cancelAtPeriodEnd
-                          ? "#ef4444"
-                          : "#22c55e",
+                        color:
+                          subscription.status === "trialing"
+                            ? "#888888"
+                            : subscription.cancelAtPeriodEnd
+                            ? "#ef4444"
+                            : "#22c55e",
                       }}
                     />
                   </div>
@@ -471,8 +491,10 @@ export default function ManageSubscriptionPage() {
                         fontFamily: "'OggText', 'Ogg', serif",
                       }}
                     >
-                      {subscription.cancelAtPeriodEnd
-                        ? "Cancelling"
+                      {subscription.status === "trialing"
+                        ? "Trial Period"
+                        : subscription.cancelAtPeriodEnd
+                        ? "Subscription Ending"
                         : "Active Subscription"}
                     </h2>
                     <p
@@ -483,40 +505,55 @@ export default function ManageSubscriptionPage() {
                           "'Helvetica Neue', -apple-system, system-ui, sans-serif",
                       }}
                     >
-                      ${(subscription.amount / 100).toFixed(2)} / month
+                      {subscription.status === "trialing"
+                        ? "Then $98/month after trial"
+                        : `$${(subscription.amount / 100).toFixed(2)} / month`}
                     </p>
                   </div>
                 </div>
-                <div
-                  style={{
-                    backgroundColor: subscription.cancelAtPeriodEnd
-                      ? "rgba(239, 68, 68, 0.1)"
-                      : "rgba(34, 197, 94, 0.1)",
-                    padding: "8px 16px",
-                    borderRadius: "20px",
-                    border: subscription.cancelAtPeriodEnd
-                      ? "1px solid rgba(239, 68, 68, 0.3)"
-                      : "1px solid rgba(34, 197, 94, 0.3)",
-                  }}
-                >
-                  <span
+                  <div
                     style={{
-                      fontSize: "12px",
-                      fontWeight: 700,
-                      color: subscription.cancelAtPeriodEnd
-                        ? "#ef4444"
-                        : "#22c55e",
-                      fontFamily: "'OggText', 'Ogg', serif",
-                      letterSpacing: "1px",
-                      textTransform: "uppercase",
+                      backgroundColor:
+                        subscription.status === "trialing"
+                          ? "rgba(136, 136, 136, 0.1)"
+                          : subscription.cancelAtPeriodEnd
+                          ? "rgba(239, 68, 68, 0.1)"
+                          : "rgba(34, 197, 94, 0.1)",
+                      padding: "8px 16px",
+                      borderRadius: "20px",
+                      border:
+                        subscription.status === "trialing"
+                          ? "1px solid rgba(136, 136, 136, 0.3)"
+                          : subscription.cancelAtPeriodEnd
+                          ? "1px solid rgba(239, 68, 68, 0.3)"
+                          : "1px solid rgba(34, 197, 94, 0.3)",
                     }}
                   >
-                    {subscription.cancelAtPeriodEnd ? "Expires Soon" : "Active"}
-                  </span>
-                </div>
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        color:
+                          subscription.status === "trialing"
+                            ? "#888888"
+                            : subscription.cancelAtPeriodEnd
+                            ? "#ef4444"
+                            : "#22c55e",
+                        fontFamily: "'OggText', 'Ogg', serif",
+                        letterSpacing: "1px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {subscription.status === "trialing"
+                        ? "Trial"
+                        : subscription.cancelAtPeriodEnd
+                        ? "Ending Soon"
+                        : "Active"}
+                    </span>
+                  </div>
               </div>
 
-              {/* Billing Period */}
+              {/* Billing Period / Trial Info */}
               <div
                 style={{
                   marginTop: "24px",
@@ -525,44 +562,120 @@ export default function ManageSubscriptionPage() {
                 }}
               >
                 <div className="space-y-4">
+                  {/* Trial End Date (if in active trial, not cancelled) */}
+                  {subscription.status === "trialing" &&
+                    subscription.trialEnd &&
+                    !subscription.cancelAtPeriodEnd && (
+                      <div className="flex items-center gap-3">
+                        <Calendar
+                          className="w-5 h-5"
+                          style={{ color: "#888888" }}
+                        />
+                        <div className="flex-1">
+                          <p
+                            style={{
+                              fontSize: "12px",
+                              color: "#666666",
+                              fontFamily: "'OggText', 'Ogg', serif",
+                              letterSpacing: "1.5px",
+                              textTransform: "uppercase",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            Trial Ends
+                          </p>
+                          <p
+                            style={{
+                              fontSize: "16px",
+                              color: "#e0e0e0",
+                              fontFamily:
+                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                              fontWeight: 600,
+                              marginBottom: "4px",
+                            }}
+                          >
+                            {new Date(subscription.trialEnd).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              }
+                            )}
+                          </p>
+                          {/* Days Remaining in Trial */}
+                          {(() => {
+                            const trialEndDate = new Date(
+                              subscription.trialEnd
+                            );
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            trialEndDate.setHours(0, 0, 0, 0);
+                            const daysRemaining = Math.ceil(
+                              (trialEndDate.getTime() - today.getTime()) /
+                                (1000 * 60 * 60 * 24)
+                            );
+                            return (
+                              <p
+                                style={{
+                                  fontSize: "12px",
+                                  color: "#888888",
+                                  fontFamily:
+                                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                                }}
+                              >
+                                {daysRemaining > 0
+                                  ? `${daysRemaining} ${
+                                      daysRemaining === 1 ? "day" : "days"
+                                    } remaining in trial`
+                                  : "Trial ending today"}
+                              </p>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
                   {/* Current Period Start */}
-                  <div className="flex items-center gap-3">
-                    <Calendar
-                      className="w-5 h-5"
-                      style={{ color: "#888888" }}
-                    />
-                    <div className="flex-1">
-                      <p
-                        style={{
-                          fontSize: "12px",
-                          color: "#666666",
-                          fontFamily: "'OggText', 'Ogg', serif",
-                          letterSpacing: "1.5px",
-                          textTransform: "uppercase",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        Current Period Start
-                      </p>
-                      <p
-                        style={{
-                          fontSize: "16px",
-                          color: "#e0e0e0",
-                          fontFamily:
-                            "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {new Date(
-                          subscription.currentPeriodStart
-                        ).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
-                      </p>
+                  {subscription.status !== "trialing" && (
+                    <div className="flex items-center gap-3">
+                      <Calendar
+                        className="w-5 h-5"
+                        style={{ color: "#888888" }}
+                      />
+                      <div className="flex-1">
+                        <p
+                          style={{
+                            fontSize: "12px",
+                            color: "#666666",
+                            fontFamily: "'OggText', 'Ogg', serif",
+                            letterSpacing: "1.5px",
+                            textTransform: "uppercase",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          Current Period Start
+                        </p>
+                        <p
+                          style={{
+                            fontSize: "16px",
+                            color: "#e0e0e0",
+                            fontFamily:
+                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {new Date(
+                            subscription.currentPeriodStart
+                          ).toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Current Period End / Next Billing Date */}
                   <div className="flex items-center gap-3">
@@ -581,7 +694,9 @@ export default function ManageSubscriptionPage() {
                           marginBottom: "4px",
                         }}
                       >
-                        {subscription.cancelAtPeriodEnd
+                        {subscription.status === "trialing" && !subscription.cancelAtPeriodEnd
+                          ? "First Billing Date"
+                          : subscription.cancelAtPeriodEnd
                           ? "Expires On"
                           : "Next Billing Date"}
                       </p>
@@ -604,7 +719,7 @@ export default function ManageSubscriptionPage() {
                         })}
                       </p>
                       {/* Days Remaining */}
-                      {(() => {
+                      {subscription.status !== "trialing" && (() => {
                         const endDate = new Date(subscription.currentPeriodEnd);
                         const today = new Date();
                         today.setHours(0, 0, 0, 0);
@@ -646,7 +761,12 @@ export default function ManageSubscriptionPage() {
                 );
                 const isEndingSoon = daysRemaining <= 7 && daysRemaining > 0;
 
-                if (isEndingSoon && subscription.cancelAtPeriodEnd) {
+                // Only show this warning for non-trial subscriptions
+                if (
+                  isEndingSoon &&
+                  subscription.cancelAtPeriodEnd &&
+                  subscription.status !== "trialing"
+                ) {
                   return (
                     <div
                       style={{
@@ -684,32 +804,59 @@ export default function ManageSubscriptionPage() {
               })()}
 
               {subscription.cancelAtPeriodEnd && (
-                <div
-                  style={{
-                    marginTop: "16px",
-                    padding: "12px 16px",
-                    borderRadius: "12px",
-                    backgroundColor: "rgba(239, 68, 68, 0.1)",
-                    border: "1px solid rgba(239, 68, 68, 0.2)",
-                  }}
-                >
-                  <p
+                  <div
                     style={{
-                      fontSize: "14px",
-                      color: "#ef4444",
-                      fontFamily:
-                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                      marginTop: "16px",
+                      padding: "12px 16px",
+                      borderRadius: "12px",
+                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                      border: "1px solid rgba(239, 68, 68, 0.2)",
                     }}
                   >
-                    Your subscription will be cancelled at the end of the
-                    current billing period. You'll continue to have access until
-                    then.
-                  </p>
-                </div>
-              )}
+                    <p
+                      style={{
+                        fontSize: "14px",
+                        color: "#ef4444",
+                        fontFamily:
+                          "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                      }}
+                    >
+                      {subscription.status === "trialing" ? (
+                        <>
+                          Your trial has been cancelled. You'll continue to have access
+                          until{" "}
+                          {subscription.trialEnd &&
+                            new Date(subscription.trialEnd).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              }
+                            )}
+                          , and you won't be charged the $98/month after that.
+                          <br />
+                          <br />
+                          <strong style={{ color: "#22c55e" }}>
+                            💰 You can still get your $10 back!
+                          </strong>{" "}
+                          Complete all submission proofs during your trial period
+                          and we'll refund your $10.
+                        </>
+                      ) : (
+                        <>
+                          Your subscription will be cancelled at the end of the
+                          current billing period. You'll continue to have access
+                          until then.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                )}
             </NeumorphicCard>
 
             {/* Cancel Subscription Section */}
+            {/* Show cancel button only for non-cancelled subscriptions */}
             {!subscription.cancelAtPeriodEnd && (
               <NeumorphicCard>
                 <h3
@@ -721,7 +868,9 @@ export default function ManageSubscriptionPage() {
                     fontFamily: "'OggText', 'Ogg', serif",
                   }}
                 >
-                  Cancel Subscription
+                  {subscription.status === "trialing"
+                    ? "Cancel Trial"
+                    : "Cancel Subscription"}
                 </h3>
                 <p
                   style={{
@@ -733,8 +882,22 @@ export default function ManageSubscriptionPage() {
                     lineHeight: "1.6",
                   }}
                 >
-                  If you cancel, you'll continue to have access until the end of
-                  your current billing period. You can resubscribe at any time.
+                  {subscription.status === "trialing" ? (
+                    <>
+                      Cancel now to avoid the $98 monthly charge. You'll keep
+                      access until your trial ends, but won't be charged after
+                      that.
+                      <br />
+                      <br />
+                      <strong style={{ color: "#22c55e" }}>
+                        Good news: You can still earn your $10 trial fee back!
+                      </strong>{" "}
+                      Complete all your submission proofs during the trial period
+                      and we'll refund your $10.
+                    </>
+                  ) : (
+                    "If you cancel, you'll continue to have access until the end of your current billing period. You can resubscribe at any time."
+                  )}
                 </p>
                 <button
                   onClick={() => setShowCancelConfirm(true)}
@@ -754,7 +917,9 @@ export default function ManageSubscriptionPage() {
                   }}
                   className="hover:bg-[rgba(239,68,68,0.15)]"
                 >
-                  Cancel Subscription
+                  {subscription.status === "trialing"
+                    ? "Cancel Trial"
+                    : "Cancel Subscription"}
                 </button>
               </NeumorphicCard>
             )}
@@ -789,10 +954,12 @@ export default function ManageSubscriptionPage() {
                         fontFamily: "'OggText', 'Ogg', serif",
                       }}
                     >
-                      Cancel Subscription?
+                      {subscription?.status === "trialing"
+                        ? "Cancel Trial?"
+                        : "Cancel Subscription?"}
                     </h3>
                   </div>
-                  <p
+                  <div
                     style={{
                       fontSize: "14px",
                       color: "#b0b0b0",
@@ -802,18 +969,61 @@ export default function ManageSubscriptionPage() {
                       lineHeight: "1.6",
                     }}
                   >
-                    Are you sure you want to cancel your subscription? You'll
-                    still have access until{" "}
-                    {subscription &&
-                      new Date(
-                        subscription.currentPeriodEnd
-                      ).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    .
-                  </p>
+                    {subscription?.status === "trialing" ? (
+                      <>
+                        <strong style={{ color: "#e0e0e0" }}>
+                          Cancel to avoid the $98 monthly charge?
+                        </strong>
+                        <br />
+                        <br />
+                        You'll keep access until{" "}
+                        {subscription.trialEnd &&
+                          new Date(subscription.trialEnd).toLocaleDateString(
+                            "en-US",
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            }
+                          )}
+                        . After that, your subscription will end and you won't be
+                        charged the $98/month.
+                        <br />
+                        <br />
+                        <div
+                          style={{
+                            padding: "12px",
+                            borderRadius: "8px",
+                            backgroundColor: "rgba(34, 197, 94, 0.1)",
+                            border: "1px solid rgba(34, 197, 94, 0.2)",
+                          }}
+                        >
+                          <strong style={{ fontSize: "13px", color: "#22c55e" }}>
+                            💰 You can still get your $10 back!
+                          </strong>
+                          <br />
+                          <span style={{ fontSize: "13px", color: "#b0b0b0" }}>
+                            Complete all submission proofs during your trial and
+                            we'll refund your $10, even if you cancel.
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        Are you sure you want to cancel your subscription? You'll
+                        still have access until{" "}
+                        {subscription &&
+                          new Date(
+                            subscription.currentPeriodEnd
+                          ).toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        .
+                      </>
+                    )}
+                  </div>
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowCancelConfirm(false)}

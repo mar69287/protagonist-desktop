@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { dynamoDb, TableNames } from "@/services/aws/dynamodb";
-import { UpdateCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { UpdateCommand, PutCommand, QueryCommand, GetCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
 import {
   generateSubmissionCalendar,
   SubmissionDay,
 } from "@/lib/generateSubmissionCalendar";
-import { createPreBillingCheckRule } from "@/services/aws/eventbridge";
+import {
+  createPreBillingCheckRule,
+  createTrialRefundCheckRule,
+} from "@/services/aws/eventbridge";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-10-29.clover",
@@ -174,8 +177,23 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const trialStart = (fullSubscription as any).trial_start;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const trialEnd = (fullSubscription as any).trial_end;
+
     console.log(
-      `Subscription period data: start=${currentPeriodStart}, end=${currentPeriodEnd}`
+      `Subscription period data: start=${currentPeriodStart}, end=${currentPeriodEnd}, trialStart=${trialStart}, trialEnd=${trialEnd}, status=${fullSubscription.status}`
+    );
+
+    // If there's a trial, use trial_start for period start and trial_end for period end
+    // This way currentPeriodEnd reflects the actual trial period during trial
+    // When trial converts to active, subscription.updated webhook will update to billing period
+    const actualPeriodStart = trialStart || currentPeriodStart;
+    const actualPeriodEnd = trialEnd || currentPeriodEnd;
+
+    console.log(
+      `Using actualPeriodStart=${actualPeriodStart ? new Date(actualPeriodStart * 1000).toISOString() : 'null'}, actualPeriodEnd=${actualPeriodEnd ? new Date(actualPeriodEnd * 1000).toISOString() : 'null'}`
     );
 
     await dynamoDb.send(
@@ -198,11 +216,11 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
               : fullSubscription.customer?.id || null,
           ":subscriptionId": fullSubscription.id,
           ":status": fullSubscription.status,
-          ":periodStart": currentPeriodStart
-            ? new Date(currentPeriodStart * 1000).toISOString()
+          ":periodStart": actualPeriodStart
+            ? new Date(actualPeriodStart * 1000).toISOString()
             : new Date().toISOString(),
-          ":periodEnd": currentPeriodEnd
-            ? new Date(currentPeriodEnd * 1000).toISOString()
+          ":periodEnd": actualPeriodEnd
+            ? new Date(actualPeriodEnd * 1000).toISOString()
             : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           ":cancelAtPeriodEnd": cancelAtPeriodEnd ?? false,
           ":updatedAt": new Date().toISOString(),
@@ -211,8 +229,6 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     );
 
     console.log(`User ${userId} subscription created successfully`);
-
-    const { GetCommand, QueryCommand } = await import("@aws-sdk/lib-dynamodb");
 
     const existingChallenges = await dynamoDb.send(
       new QueryCommand({
@@ -229,32 +245,39 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     const isFirstSubscription =
       !existingChallenges.Items || existingChallenges.Items.length === 0;
 
-    // If this is the first subscription, set it to cancel at period end
     if (isFirstSubscription) {
-      console.log(
-        `First subscription for user ${userId} - setting cancel_at_period_end to true`
-      );
+      // If this is the first subscription AND it's NOT a trial, set it to cancel at period end
+      // For trial subscriptions, we'll set cancel_at_period_end when the first full monthly payment is made
+      if (!trialEnd) {
+        console.log(
+          `First subscription for user ${userId} (no trial) - setting cancel_at_period_end to true`
+        );
 
-      // Update Stripe subscription to cancel at period end
-      await stripe.subscriptions.update(fullSubscription.id, {
-        cancel_at_period_end: true,
-      });
+        // Update Stripe subscription to cancel at period end
+        await stripe.subscriptions.update(fullSubscription.id, {
+          cancel_at_period_end: true,
+        });
 
-      console.log(
-        `Subscription ${fullSubscription.id} set to cancel at period end`
-      );
+        console.log(
+          `Subscription ${fullSubscription.id} set to cancel at period end`
+        );
 
-      // Update DynamoDB to reflect this
-      await dynamoDb.send(
-        new UpdateCommand({
-          TableName: TableNames.USERS,
-          Key: { userId: userId },
-          UpdateExpression: "SET cancelAtPeriodEnd = :cancel",
-          ExpressionAttributeValues: {
-            ":cancel": true,
-          },
-        })
-      );
+        // Update DynamoDB to reflect this
+        await dynamoDb.send(
+          new UpdateCommand({
+            TableName: TableNames.USERS,
+            Key: { userId: userId },
+            UpdateExpression: "SET cancelAtPeriodEnd = :cancel",
+            ExpressionAttributeValues: {
+              ":cancel": true,
+            },
+          })
+        );
+      } else {
+        console.log(
+          `First subscription for user ${userId} has trial - will set cancel_at_period_end after first full monthly payment`
+        );
+      }
 
       // Fetch onboarding data
       const onboardingData = await dynamoDb.send(
@@ -276,13 +299,29 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       const challengeId = uuidv4();
 
       // Calculate start and end dates
-      const startDate = currentPeriodStart
+      // For trial subscriptions, current_period_start is when the actual subscription begins (after trial)
+      // So we need to use trial_start or "now" for the challenge start date
+      // (trialStart and trialEnd are already declared above)
+
+      // If there's a trial, start the challenge NOW (trial start time)
+      // Otherwise, use current_period_start
+      const startDate = trialStart
+        ? new Date(trialStart * 1000).toISOString()
+        : currentPeriodStart
         ? new Date(currentPeriodStart * 1000).toISOString()
         : new Date().toISOString();
 
+      // Challenge should ALWAYS span the full 30-day billing period
+      // Use current_period_end (billing period end), NOT trial_end
       const endDate = currentPeriodEnd
         ? new Date(currentPeriodEnd * 1000).toISOString()
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      console.log(
+        `Challenge dates: startDate=${startDate}, endDate=${endDate}${
+          trialEnd ? `, trialEnd=${new Date(trialEnd * 1000).toISOString()}` : ""
+        }`
+      );
 
       // Generate submission calendar
       const scheduleDays = structuredSchedule.days || [];
@@ -389,6 +428,19 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log(`Subscription updated: ${subscription.id}`);
+  
+  // Print full subscription object for debugging
+  console.log("Full subscription object:");
+  console.log(JSON.stringify({
+    id: subscription.id,
+    status: subscription.status,
+    current_period_start: (subscription as any).current_period_start,
+    current_period_end: (subscription as any).current_period_end,
+    trial_start: (subscription as any).trial_start,
+    trial_end: (subscription as any).trial_end,
+    cancel_at_period_end: (subscription as any).cancel_at_period_end,
+    billing_cycle_anchor: (subscription as any).billing_cycle_anchor,
+  }, null, 2));
 
   const userId = subscription.metadata?.user_id;
   if (!userId) {
@@ -405,33 +457,54 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     const currentPeriodEnd = (subscription as any).current_period_end;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const trialEnd = (subscription as any).trial_end;
+
+    // If subscription is ACTIVELY in trial (status="trialing"), use trial_end for currentPeriodEnd
+    // Otherwise use current_period_end (billing period end)
+    // Note: trialEnd still exists after trial ends, so we must check status
+    const actualPeriodEnd = subscription.status === "trialing" && trialEnd ? trialEnd : currentPeriodEnd;
+
+    console.log(
+      `Updating subscription: status=${subscription.status}, trialEnd=${trialEnd ? new Date(trialEnd * 1000).toISOString() : 'null'}, using ${subscription.status === "trialing" ? "trial end" : "billing period end"} for currentPeriodEnd`
+    );
+    console.log(
+      `Period values from webhook: currentPeriodStart=${currentPeriodStart}, currentPeriodEnd=${currentPeriodEnd}`
+    );
+
+    // Build update expression dynamically - only update period dates if they exist in the webhook
+    let updateExpression = `SET subscriptionStatus = :status, cancelAtPeriodEnd = :cancelAtPeriodEnd, updatedAt = :updatedAt`;
+    const expressionAttributeValues: Record<string, any> = {
+      ":status": subscription.status,
+      ":cancelAtPeriodEnd": cancelAtPeriodEnd ?? false,
+      ":updatedAt": new Date().toISOString(),
+    };
+
+    // Only update period dates if they're present in the webhook
+    if (currentPeriodStart) {
+      updateExpression += `, currentPeriodStart = :periodStart`;
+      expressionAttributeValues[":periodStart"] = new Date(currentPeriodStart * 1000).toISOString();
+    }
+    
+    if (actualPeriodEnd) {
+      updateExpression += `, currentPeriodEnd = :periodEnd`;
+      expressionAttributeValues[":periodEnd"] = new Date(actualPeriodEnd * 1000).toISOString();
+    }
 
     await dynamoDb.send(
       new UpdateCommand({
         TableName: TableNames.USERS,
         Key: { userId: userId },
-        UpdateExpression: `
-          SET subscriptionStatus = :status,
-              currentPeriodStart = :periodStart,
-              currentPeriodEnd = :periodEnd,
-              cancelAtPeriodEnd = :cancelAtPeriodEnd,
-              updatedAt = :updatedAt
-        `,
-        ExpressionAttributeValues: {
-          ":status": subscription.status,
-          ":periodStart": currentPeriodStart
-            ? new Date(currentPeriodStart * 1000).toISOString()
-            : new Date().toISOString(),
-          ":periodEnd": currentPeriodEnd
-            ? new Date(currentPeriodEnd * 1000).toISOString()
-            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          ":cancelAtPeriodEnd": cancelAtPeriodEnd ?? false,
-          ":updatedAt": new Date().toISOString(),
-        },
+        UpdateExpression: updateExpression,
+        ExpressionAttributeValues: expressionAttributeValues,
       })
     );
 
-    console.log(`User ${userId} subscription updated successfully`);
+    console.log(`✅ User ${userId} subscription updated in DynamoDB:`);
+    console.log(`   status: ${subscription.status}`);
+    console.log(`   currentPeriodStart: ${currentPeriodStart ? new Date(currentPeriodStart * 1000).toISOString() : 'null'}`);
+    console.log(`   currentPeriodEnd: ${actualPeriodEnd ? new Date(actualPeriodEnd * 1000).toISOString() : 'null'}`);
+    console.log(`   cancelAtPeriodEnd: ${cancelAtPeriodEnd}`);
   } catch (error) {
     console.error("Error updating user subscription:", error);
     throw error;
@@ -630,37 +703,48 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       );
     }
 
-    // Update user with subscription period dates
-    await dynamoDb.send(
-      new UpdateCommand({
-        TableName: TableNames.USERS,
-        Key: { userId: userId },
-        UpdateExpression: `
-          SET currentPeriodStart = :periodStart,
-              currentPeriodEnd = :periodEnd,
-              updatedAt = :updatedAt
-        `,
-        ExpressionAttributeValues: {
-          ":periodStart": actualPeriodStart
-            ? new Date(actualPeriodStart * 1000).toISOString()
-            : new Date().toISOString(),
-          ":periodEnd": actualPeriodEnd
-            ? new Date(actualPeriodEnd * 1000).toISOString()
-            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          ":updatedAt": new Date().toISOString(),
-        },
-      })
-    );
+    // Check if subscription is in trial before updating period dates
+    const subscriptionToCheck = await stripe.subscriptions.retrieve(subscriptionId);
+    
+    // Only update period dates if NOT in trial
+    // During trial, the subscription.created webhook already set trial_end as currentPeriodEnd
+    if (subscriptionToCheck.status === "trialing") {
+      console.log(
+        `⏸️  Skipping period update - subscription is in trial. Trial period already set by subscription.created webhook.`
+      );
+    } else {
+      // Update user with subscription period dates
+      await dynamoDb.send(
+        new UpdateCommand({
+          TableName: TableNames.USERS,
+          Key: { userId: userId },
+          UpdateExpression: `
+            SET currentPeriodStart = :periodStart,
+                currentPeriodEnd = :periodEnd,
+                updatedAt = :updatedAt
+          `,
+          ExpressionAttributeValues: {
+            ":periodStart": actualPeriodStart
+              ? new Date(actualPeriodStart * 1000).toISOString()
+              : new Date().toISOString(),
+            ":periodEnd": actualPeriodEnd
+              ? new Date(actualPeriodEnd * 1000).toISOString()
+              : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            ":updatedAt": new Date().toISOString(),
+          },
+        })
+      );
 
-    console.log(`✅ User ${userId} period updated in DynamoDB:`);
-    console.log(
-      `   currentPeriodStart: ${new Date(
-        actualPeriodStart * 1000
-      ).toISOString()}`
-    );
-    console.log(
-      `   currentPeriodEnd: ${new Date(actualPeriodEnd * 1000).toISOString()}`
-    );
+      console.log(`✅ User ${userId} period updated in DynamoDB:`);
+      console.log(
+        `   currentPeriodStart: ${new Date(
+          actualPeriodStart * 1000
+        ).toISOString()}`
+      );
+      console.log(
+        `   currentPeriodEnd: ${new Date(actualPeriodEnd * 1000).toISOString()}`
+      );
+    }
 
     // In API version 2025-10-29.clover, invoices don't include payment_intent directly
     // We need to list PaymentIntents associated with this invoice
@@ -754,30 +838,138 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       `✅ Payment recorded for user ${userId} with PaymentIntent ${paymentIntentId}`
     );
 
-    // Create EventBridge rule for next billing cycle (1 hour before billing time)
-    // Do this for both initial subscriptions and renewals
-    console.log(
-      `📅 Stripe will bill at: ${new Date(
-        actualPeriodEnd * 1000
-      ).toISOString()}`
-    );
+    // Get subscription to check for trial
+    const fullSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const trialEnd = (fullSubscription as any).trial_end;
 
-    const oneHourBeforeBilling = new Date(actualPeriodEnd * 1000 - 3600000); // Subtract 1 hour
+    // Check if this is the first full monthly payment (amount > $10) after a trial
+    // If so, set cancel_at_period_end = true
+    const paymentAmount = (invoice.amount_paid ?? 0) / 100;
+    if (paymentAmount > 10 && fullSubscription.status === "active") {
+      console.log(
+        `💰 Payment amount is $${paymentAmount} - checking if this is first full monthly payment`
+      );
 
-    await createPreBillingCheckRule(
-      userId,
-      subscriptionId,
-      invoice.id, // Pass the paymentId (invoice ID)
-      oneHourBeforeBilling
-    );
+      // Scan payment history to see if there are any other payments > $10 for this subscription
+      const paymentHistoryScan = await dynamoDb.send(
+        new ScanCommand({
+          TableName: TableNames.PAYMENT_HISTORY,
+          FilterExpression: "subscriptionId = :subscriptionId AND amount > :amount AND #type = :type",
+          ExpressionAttributeNames: {
+            "#type": "type",
+          },
+          ExpressionAttributeValues: {
+            ":subscriptionId": subscriptionId,
+            ":amount": 10,
+            ":type": "payment",
+          },
+        })
+      );
 
-    const eventType =
-      billingReason === "subscription_create"
-        ? "initial subscription"
-        : "renewal";
-    console.log(
-      `✅ EventBridge rule created for ${eventType} of user ${userId} - will fire at ${oneHourBeforeBilling.toISOString()} (1 hour before billing)`
-    );
+      const previousFullPayments = paymentHistoryScan.Items || [];
+      console.log(
+        `Found ${previousFullPayments.length} payment(s) > $10 for subscription ${subscriptionId} (including current one)`
+      );
+
+      // If this is the first full payment (only 1 payment > $10 exists, which is the current one)
+      if (previousFullPayments.length === 1) {
+        console.log(
+          `🎯 First full monthly payment detected - setting cancel_at_period_end to true`
+        );
+
+        try {
+          // Update Stripe subscription to cancel at period end
+          await stripe.subscriptions.update(fullSubscription.id, {
+            cancel_at_period_end: true,
+          });
+
+          // Update DynamoDB to reflect this
+          await dynamoDb.send(
+            new UpdateCommand({
+              TableName: TableNames.USERS,
+              Key: { userId: userId },
+              UpdateExpression: "SET cancelAtPeriodEnd = :cancel",
+              ExpressionAttributeValues: {
+                ":cancel": true,
+              },
+            })
+          );
+
+          console.log(
+            `✅ Subscription ${fullSubscription.id} set to cancel at period end after first full payment`
+          );
+        } catch (error) {
+          console.error(
+            `Failed to set cancel_at_period_end for subscription ${fullSubscription.id}:`,
+            error
+          );
+          // Don't fail the webhook if this update fails
+        }
+      }
+    }
+
+    // If this is a trial subscription, create a trial refund check FIRST
+    if (trialEnd && billingReason === "subscription_create") {
+      const trialEndDate = new Date(trialEnd * 1000);
+      const oneHourBeforeTrialEnd = new Date(
+        trialEndDate.getTime() - 3600000 // 1 hour
+      );
+
+      console.log(
+        `🎯 Trial subscription detected - trial ends at: ${trialEndDate.toISOString()}`
+      );
+
+      try {
+        await createTrialRefundCheckRule(
+          userId,
+          subscriptionId,
+          invoice.id, // Use the $10 trial payment invoice ID
+          trialEndDate
+        );
+
+        console.log(
+          `✅ Trial refund EventBridge rule created for user ${userId} - will fire at ${oneHourBeforeTrialEnd.toISOString()} (1 hour before trial ends)`
+        );
+      } catch (error) {
+        console.error(
+          `Failed to create trial refund rule for user ${userId}:`,
+          error
+        );
+        // Don't fail the webhook if EventBridge rule creation fails
+      }
+
+      // Skip creating monthly refund rule for trial subscriptions
+      // The monthly rule will be created when the first $98 payment succeeds
+      console.log(
+        `⏭️  Skipping monthly refund rule creation for trial - will create when first full payment succeeds`
+      );
+    } else {
+      // Create EventBridge rule for next billing cycle (1 hour before billing time)
+      // Do this for non-trial initial subscriptions and all renewals
+      console.log(
+        `📅 Stripe will bill at: ${new Date(
+          actualPeriodEnd * 1000
+        ).toISOString()}`
+      );
+
+      const oneHourBeforeBilling = new Date(actualPeriodEnd * 1000 - 3600000); // Subtract 1 hour
+
+      await createPreBillingCheckRule(
+        userId,
+        subscriptionId,
+        invoice.id, // Pass the paymentId (invoice ID)
+        oneHourBeforeBilling
+      );
+
+      const eventType =
+        billingReason === "subscription_create"
+          ? "initial subscription"
+          : "renewal";
+      console.log(
+        `✅ EventBridge rule created for ${eventType} of user ${userId} - will fire at ${oneHourBeforeBilling.toISOString()} (1 hour before billing)`
+      );
+    }
   } catch (error) {
     console.error("Error handling successful payment:", error);
     throw error;

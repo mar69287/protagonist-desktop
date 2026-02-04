@@ -337,7 +337,7 @@ function ReturnPageContent() {
                 </div>
               </div>
 
-              <div
+              {/* <div
                 style={{
                   marginTop: "24px",
                   paddingTop: "24px",
@@ -396,7 +396,7 @@ function ReturnPageContent() {
                     <span style={{ color: "#22c55e" }}>$50 back (max)</span>
                   </div>
                 </div>
-              </div>
+              </div> */}
             </div>
           </NeumorphicCard>
 

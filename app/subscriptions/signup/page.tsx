@@ -110,6 +110,7 @@ function SignupContent() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
+  const [useTrial, setUseTrial] = useState(true); // Toggle for trial option
 
   // Fetch user data when userId is available
   useEffect(() => {
@@ -399,8 +400,8 @@ function SignupContent() {
                       textAlign: "center",
                     }}
                   >
-                    Define your goal and commit $98 to hold yourself
-                    accountable.
+                    Try it risk-free with a $10 trial. Complete all submissions
+                    in 3 days and get your money back!
                   </p>
                 </NeumorphicCard>
 
@@ -503,43 +504,256 @@ function SignupContent() {
                       </span>
                     </div>
 
-                    {/* First Month */}
-                    <div className="text-center mb-6 sm:mb-8 mt-4 sm:mt-4">
-                      <h3
+                    {/* Trial Toggle Options */}
+                    <div className="mb-6 sm:mb-8 mt-4 sm:mt-4">
+                      {/* Compact Toggle Buttons */}
+                      <div
                         style={{
-                          fontSize: "24px",
-                          fontWeight: 800,
-                          color: "#e0e0e0",
-                          marginBottom: "8px",
-                          fontFamily: "'OggText', 'Ogg', serif",
+                          display: "inline-flex",
+                          backgroundColor: "rgba(0, 0, 0, 0.3)",
+                          borderRadius: "12px",
+                          padding: "4px",
+                          border: "1px solid rgba(255, 255, 255, 0.08)",
+                          margin: "0 auto 20px",
+                          width: "100%",
+                          maxWidth: "400px",
                         }}
                       >
-                        First Month
-                      </h3>
-                      <div className="flex items-baseline justify-center">
-                        <span
+                        {/* With Trial Option */}
+                        <button
+                          onClick={() => setUseTrial(true)}
                           style={{
-                            fontSize: "48px",
+                            flex: 1,
+                            padding: "10px 16px",
+                            borderRadius: "8px",
+                            border: "none",
+                            backgroundColor: useTrial
+                              ? "#888888"
+                              : "transparent",
+                            color: useTrial ? "#1a1a1a" : "#888888",
+                            cursor: "pointer",
+                            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            fontFamily:
+                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            position: "relative",
+                          }}
+                        >
+                          <div style={{ position: "relative", zIndex: 1 }}>
+                            $10 Trial
+                            {useTrial && (
+                              <span
+                                style={{
+                                  display: "block",
+                                  fontSize: "10px",
+                                  opacity: 0.7,
+                                  marginTop: "2px",
+                                }}
+                              >
+                                Recommended
+                              </span>
+                            )}
+                          </div>
+                        </button>
+
+                        {/* Without Trial Option */}
+                        <button
+                          onClick={() => setUseTrial(false)}
+                          style={{
+                            flex: 1,
+                            padding: "10px 16px",
+                            borderRadius: "8px",
+                            border: "none",
+                            backgroundColor: !useTrial
+                              ? "#888888"
+                              : "transparent",
+                            color: !useTrial ? "#1a1a1a" : "#888888",
+                            cursor: "pointer",
+                            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            fontFamily:
+                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            position: "relative",
+                          }}
+                        >
+                          <div style={{ position: "relative", zIndex: 1 }}>
+                            $98/month
+                          </div>
+                        </button>
+                      </div>
+
+                      {/* Selected Plan Details with Animation */}
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={useTrial ? "trial" : "no-trial"}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ duration: 0.3 }}
+                          className="text-center"
+                        >
+                          {useTrial ? (
+                            <>
+                              <div className="flex items-baseline justify-center gap-2 mb-2">
+                                <span
+                                  style={{
+                                    fontSize: "48px",
+                                    fontWeight: 800,
+                                    color: "#e0e0e0",
+                                    fontFamily: "'OggText', 'Ogg', serif",
+                                  }}
+                                >
+                                  $10
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: "16px",
+                                    color: "#888888",
+                                    fontFamily:
+                                      "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                                  }}
+                                >
+                                  today
+                                </span>
+                              </div>
+                              <p
+                                style={{
+                                  color: "#22c55e",
+                                  fontSize: "14px",
+                                  marginBottom: "4px",
+                                  fontWeight: 600,
+                                  fontFamily:
+                                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                                }}
+                              >
+                                Complete all proofs in 3 days → Get $10 back!
+                              </p>
+                              <p
+                                style={{
+                                  color: "#888888",
+                                  fontSize: "13px",
+                                  fontFamily:
+                                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                                }}
+                              >
+                                Then $98/month after trial ends
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-baseline justify-center gap-2 mb-2">
+                                <span
+                                  style={{
+                                    fontSize: "48px",
+                                    fontWeight: 800,
+                                    color: "#e0e0e0",
+                                    fontFamily: "'OggText', 'Ogg', serif",
+                                  }}
+                                >
+                                  $98
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: "16px",
+                                    color: "#888888",
+                                    fontFamily:
+                                      "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                                  }}
+                                >
+                                  /month
+                                </span>
+                              </div>
+                              <p
+                                style={{
+                                  color: "#b0b0b0",
+                                  fontSize: "14px",
+                                  marginBottom: "4px",
+                                  fontFamily:
+                                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                                }}
+                              >
+                                Start your commitment immediately
+                              </p>
+                              <p
+                                style={{
+                                  color: "#888888",
+                                  fontSize: "13px",
+                                  fontFamily:
+                                    "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                                }}
+                              >
+                                Billed monthly at $98
+                              </p>
+                            </>
+                          )}
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Trial Period Refund (if trial selected) */}
+                    {useTrial && (
+                      <div
+                        style={{
+                          backgroundColor: "rgba(34, 197, 94, 0.1)",
+                          borderRadius: "16px",
+                          padding: "20px",
+                          marginBottom: "24px",
+                          border: "1px solid rgba(34, 197, 94, 0.2)",
+                        }}
+                      >
+                        <h4
+                          style={{
+                            fontSize: "16px",
                             fontWeight: 800,
-                            color: "#e0e0e0",
+                            color: "#22c55e",
+                            marginBottom: "8px",
+                            textAlign: "center",
                             fontFamily: "'OggText', 'Ogg', serif",
                           }}
                         >
-                          $98
-                        </span>
+                          Trial Period Refund
+                        </h4>
+                        <p
+                          style={{
+                            fontSize: "14px",
+                            color: "#b0b0b0",
+                            marginBottom: "12px",
+                            textAlign: "center",
+                            fontFamily:
+                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                          }}
+                        >
+                          Complete all your submission proofs within the 3-day
+                          trial period and get your full $10 back!
+                        </p>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "8px",
+                            padding: "12px 16px",
+                            borderRadius: "12px",
+                            backgroundColor: "rgba(34, 197, 94, 0.15)",
+                          }}
+                        >
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                          <span
+                            style={{
+                              color: "#22c55e",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              fontFamily:
+                                "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            }}
+                          >
+                            100% completion in trial = Full $10 refund
+                          </span>
+                        </div>
                       </div>
-                      <p
-                        style={{
-                          color: "#b0b0b0",
-                          marginTop: "8px",
-                          fontSize: "14px",
-                          fontFamily:
-                            "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                        }}
-                      >
-                        Full refund possible - prove your commitment
-                      </p>
-                    </div>
+                    )}
 
                     {/* First Month Refund Structure */}
                     <div
@@ -556,13 +770,29 @@ function SignupContent() {
                           fontSize: "16px",
                           fontWeight: 800,
                           color: "#b0b0b0",
-                          marginBottom: "16px",
+                          marginBottom: "8px",
                           textAlign: "center",
                           fontFamily: "'OggText', 'Ogg', serif",
                         }}
                       >
-                        First Month Earnings
+                        {useTrial
+                          ? "After Trial: Monthly Earnings"
+                          : "First Month Earnings"}
                       </h4>
+                      <p
+                        style={{
+                          fontSize: "13px",
+                          color: "#888888",
+                          marginBottom: "16px",
+                          textAlign: "center",
+                          fontFamily:
+                            "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                        }}
+                      >
+                        {useTrial
+                          ? "Based on your completion rate during the full 30-day period"
+                          : "Based on your completion rate during the first 30 days"}
+                      </p>
                       <div className="space-y-3 sm:space-y-4">
                         <div
                           style={{
@@ -934,11 +1164,9 @@ function SignupContent() {
                           }}
                           className="group-hover:text-[#b0b0b0] transition-colors"
                         >
-                          I understand this is a monthly subscription with
-                          different pricing and refund structures. I commit to
-                          tracking my progress honestly and understand that
-                          refunds are based on verified completion percentages.
-                          I can cancel anytime.
+                          {useTrial
+                            ? "I understand this starts with a $10 3-day trial, then becomes a $98/month subscription. I can get my $10 back by completing all submission proofs during the trial. I commit to tracking my progress honestly and understand that refunds are based on verified completion percentages. I can cancel anytime."
+                            : "I understand this is a $98/month subscription. I commit to tracking my progress honestly and understand that refunds are based on verified completion percentages. I can cancel anytime."}
                         </span>
                       </div>
                     </div>
@@ -1069,7 +1297,13 @@ function SignupContent() {
 
               {/* White container for Stripe checkout */}
               <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-8 md:p-12 shadow-2xl">
-                {userId && <CheckoutForm userId={userId} email={user?.email} />}
+                {userId && (
+                  <CheckoutForm
+                    userId={userId}
+                    email={user?.email}
+                    useTrial={useTrial}
+                  />
+                )}
               </div>
 
               <button
