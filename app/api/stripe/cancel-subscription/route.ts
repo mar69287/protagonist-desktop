@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { authenticatedUser } from "@/services/aws/amplify-server-utils";
+
+// Force Node.js runtime for Netlify compatibility
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 

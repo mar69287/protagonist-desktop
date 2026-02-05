@@ -4,6 +4,10 @@ import { authenticatedUser } from "@/services/aws/amplify-server-utils";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 
+// Force Node.js runtime for Netlify compatibility
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-10-29.clover",
 });

@@ -4,6 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { dynamoDb, TableNames } from "@/services/aws/dynamodb";
 
+// Force Node.js runtime for Netlify compatibility
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;

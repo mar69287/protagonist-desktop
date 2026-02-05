@@ -4,6 +4,10 @@ import { dynamoDb, TableNames } from "@/services/aws/dynamodb";
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { SubmissionDay } from "@/lib/generateSubmissionCalendar";
 
+// Force Node.js runtime for Netlify compatibility
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-10-29.clover",
 });

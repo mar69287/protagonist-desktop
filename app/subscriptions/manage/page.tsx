@@ -451,7 +451,7 @@ export default function ManageSubscriptionPage() {
                 journey today!
               </p>
               <a
-                href="/subscriptions/signup"
+                href={`/subscriptions/signup?userId=${dbUser?.userId || authUser?.id || ''}`}
                 style={{
                   display: "inline-block",
                   backgroundColor: "#e0e0e0",

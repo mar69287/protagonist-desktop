@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
+// Force Node.js runtime for Netlify compatibility
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 // Initialize Stripe with your secret key
 // Make sure to add STRIPE_SECRET_KEY to your .env.local
 // STRIPE_SECRET_KEY=sk_test_...
