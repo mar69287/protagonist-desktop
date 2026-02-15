@@ -924,11 +924,19 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
         `🎯 Trial subscription detected - trial ends at: ${trialEndDate.toISOString()}`
       );
 
+      // Verify this is the trial payment (should be $3)
+      const paymentAmount = (invoice.amount_paid ?? 0) / 100;
+      if (paymentAmount !== 3) {
+        console.warn(
+          `⚠️ Expected $3 trial payment, but invoice amount is $${paymentAmount}. This might not be the trial payment.`
+        );
+      }
+
       try {
         await createTrialRefundCheckRule(
           userId,
           subscriptionId,
-          invoice.id, // Use the $10 trial payment invoice ID
+          invoice.id, // Use the $3 trial payment invoice ID
           trialEndDate
         );
 
@@ -944,7 +952,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       }
 
       // Skip creating monthly refund rule for trial subscriptions
-      // The monthly rule will be created when the first $98 payment succeeds
+      // The monthly rule will be created when the first full monthly payment succeeds
       console.log(
         `⏭️  Skipping monthly refund rule creation for trial - will create when first full payment succeeds`
       );

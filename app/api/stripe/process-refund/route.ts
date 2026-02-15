@@ -389,14 +389,21 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Calculate refund for trial period (max $10)
+ * Calculate refund for trial period ($3 total)
  *
- * Trial period is typically 3 days, and user has already paid $10.
- * This is an all-or-nothing test to prove commitment during the trial.
+ * Trial period is 3 days, and user has already paid $3.
+ * Refund is calculated per successful submission based on total submissions in the period.
  *
  * Refund structure:
- * - 100% completion: Full $10 refund
- * - <100%: No refund
+ * - If 0 submissions in period: Full $3 refund
+ * - Otherwise: $3 ÷ total submissions = refund per submission
+ * - Refund amount = verified submissions × refund per submission
+ *
+ * Examples:
+ * - 3 submissions: $3 ÷ 3 = $1 per submission
+ * - 2 submissions: $3 ÷ 2 = $1.50 per submission
+ * - 1 submission: $3 ÷ 1 = $3 per submission
+ * - 0 submissions: Full $3 refund
  */
 function calculateTrialRefund(
   totalExpected: number,
@@ -410,26 +417,37 @@ function calculateTrialRefund(
   isFirstBillingCycle: boolean;
 } {
   const missedSubmissions = totalExpected - verifiedCount;
+  const TRIAL_PRICE = 3; // $3 trial price
 
   // Calculate completion rate
   const completionRate =
     totalExpected > 0 ? (verifiedCount / totalExpected) * 100 : 0;
 
-  // All-or-nothing: Only 100% completion gets refund
-  const refundAmount = completionRate === 100 ? 10 : 0;
+  let refundAmount = 0;
 
-  console.log(
-    `Trial Completion: ${completionRate.toFixed(
-      2
-    )}% (${verifiedCount}/${totalExpected}) - Refund: $${refundAmount}`
-  );
+  // If no submissions in the timeframe, full refund
+  if (totalExpected === 0) {
+    refundAmount = TRIAL_PRICE;
+    console.log(
+      `Trial: No submissions in period - Full $${TRIAL_PRICE} refund`
+    );
+  } else {
+    // Calculate refund per submission: $3 ÷ total submissions
+    const refundPerSubmission = TRIAL_PRICE / totalExpected;
+    // Refund amount = verified submissions × refund per submission
+    refundAmount = verifiedCount * refundPerSubmission;
+
+    console.log(
+      `Trial: ${verifiedCount}/${totalExpected} verified submissions - $${TRIAL_PRICE} ÷ ${totalExpected} = $${refundPerSubmission.toFixed(2)} per submission - Refund: $${refundAmount.toFixed(2)}`
+    );
+  }
 
   return {
     totalExpected,
     successfulSubmissions: verifiedCount,
     missedSubmissions,
     completionRate,
-    refundAmount,
+    refundAmount: Math.round(refundAmount * 100) / 100, // Round to 2 decimal places
     isFirstBillingCycle: false, // Not applicable for trial
   };
 }
