@@ -22,13 +22,26 @@ async function generateSentencesWithClaude(
 
     // Initialize Anthropic client lazily to avoid initialization errors
     const apiKey = rawApiKey.trim();
-    console.log("🔑 [Sentences API] Using API key for Claude request:", {
-      length: apiKey.length,
+    
+    // Log detailed key info for debugging
+    const keyInfo = {
+      originalLength: rawApiKey.length,
+      trimmedLength: apiKey.length,
       preview: apiKey.length > 20 
-        ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}`
-        : `${apiKey.substring(0, Math.min(10, apiKey.length))}...`,
-      startsWith: apiKey.substring(0, Math.min(7, apiKey.length)),
-    });
+        ? `${apiKey.substring(0, 15)}...${apiKey.substring(apiKey.length - 4)}`
+        : `${apiKey.substring(0, Math.min(15, apiKey.length))}...`,
+      startsWith: apiKey.substring(0, Math.min(15, apiKey.length)),
+      hasNewlines: rawApiKey.includes('\n') || rawApiKey.includes('\r'),
+      hasSpaces: rawApiKey !== rawApiKey.trim(),
+      firstChars: apiKey.substring(0, 20),
+    };
+    
+    console.log("🔑 [Sentences API] Using API key for Claude request:", keyInfo);
+    
+    // Double-check the key before using it
+    if (keyInfo.hasNewlines || keyInfo.hasSpaces) {
+      console.warn("⚠️ [Sentences API] API key had whitespace that was trimmed");
+    }
     
     const anthropic = new Anthropic({
       apiKey: apiKey,
@@ -170,7 +183,7 @@ export async function GET(request: NextRequest) {
       const apiKeyLength = rawApiKey.length;
       const apiKeyPreview = rawApiKey.length > 20 
         ? `${rawApiKey.substring(0, 10)}...${rawApiKey.substring(apiKeyLength - 4)}`
-        : `${rawApiKey.substring(0, Math.min(10, apiKeyLength)))}...`;
+        : `${rawApiKey.substring(0, Math.min(10, apiKeyLength))}...`;
       const hasWhitespace = rawApiKey !== rawApiKey.trim();
       
       console.log("🔑 [Sentences API] CLAUDE_API_KEY info:", {
@@ -196,10 +209,29 @@ export async function GET(request: NextRequest) {
 
     // Validate API key format (should start with 'sk-ant-' or 'sk-')
     const apiKey = rawApiKey.trim();
-    if (!apiKey.startsWith('sk-ant-') && !apiKey.startsWith('sk-')) {
+    
+    // Check for common issues
+    const hasNewlines = rawApiKey.includes('\n') || rawApiKey.includes('\r');
+    const hasLeadingTrailingSpaces = rawApiKey !== rawApiKey.trim();
+    
+    if (hasNewlines || hasLeadingTrailingSpaces) {
+      console.warn("⚠️ [Sentences API] API key has whitespace issues:", {
+        hasNewlines,
+        hasLeadingTrailingSpaces,
+        originalLength: rawApiKey.length,
+        trimmedLength: apiKey.length,
+      });
+    }
+    
+    // Validate format - Anthropic keys can start with sk-ant-api03-, sk-ant-, or sk-
+    const isValidFormat = apiKey.startsWith('sk-ant-api03-') || 
+                          apiKey.startsWith('sk-ant-') || 
+                          apiKey.startsWith('sk-');
+    
+    if (!isValidFormat) {
       console.error("❌ [Sentences API] CLAUDE_API_KEY appears to be invalid format");
       console.error("❌ [Sentences API] API key preview:", apiKey.substring(0, 20) + "...");
-      console.error("❌ [Sentences API] Expected to start with 'sk-ant-' or 'sk-'");
+      console.error("❌ [Sentences API] Expected to start with 'sk-ant-api03-', 'sk-ant-', or 'sk-'");
       return NextResponse.json(
         { 
           error: "Server configuration error: Invalid API key format",
@@ -209,7 +241,11 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    console.log("✅ [Sentences API] CLAUDE_API_KEY format validated");
+    console.log("✅ [Sentences API] CLAUDE_API_KEY format validated:", {
+      format: apiKey.startsWith('sk-ant-api03-') ? 'sk-ant-api03-*' : 
+              apiKey.startsWith('sk-ant-') ? 'sk-ant-*' : 'sk-*',
+      length: apiKey.length,
+    });
 
     // Check AWS credentials
     if (!process.env.AWS_ACCESS_KEY_ID_NEXT || !process.env.AWS_SECRET_ACCESS_KEY_NEXT) {
