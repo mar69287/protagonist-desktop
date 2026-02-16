@@ -3,7 +3,6 @@ import { TableNames } from "@/services/aws/dynamodb";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import Anthropic from "@anthropic-ai/sdk";
 
 // Force Node.js runtime for Netlify compatibility
 export const runtime = "nodejs";
@@ -14,44 +13,11 @@ async function generateSentencesWithClaude(
   why: string
 ): Promise<{ sentence1: string; sentence2: string; sentence3: string } | null> {
   try {
-    const rawApiKey = process.env.CLAUDE_API_KEY;
-    if (!rawApiKey) {
-      console.error("❌ [Sentences API] CLAUDE_API_KEY not found in generateSentencesWithClaude");
+    const apiKey = process.env.CLAUDE_API_KEY?.trim();
+    if (!apiKey) {
+      console.error("❌ [Sentences API] CLAUDE_API_KEY not found");
       return null;
     }
-
-    // Initialize Anthropic client lazily to avoid initialization errors
-    const apiKey = rawApiKey.trim();
-    
-    // Log detailed key info for debugging
-    const keyInfo = {
-      originalLength: rawApiKey.length,
-      trimmedLength: apiKey.length,
-      preview: apiKey.length > 20 
-        ? `${apiKey.substring(0, 15)}...${apiKey.substring(apiKey.length - 4)}`
-        : `${apiKey.substring(0, Math.min(15, apiKey.length))}...`,
-      startsWith: apiKey.substring(0, Math.min(15, apiKey.length)),
-      hasNewlines: rawApiKey.includes('\n') || rawApiKey.includes('\r'),
-      hasSpaces: rawApiKey !== rawApiKey.trim(),
-      firstChars: apiKey.substring(0, 20),
-    };
-    
-    console.log("🔑 [Sentences API] Using API key for Claude request:", keyInfo);
-    
-    // Double-check the key before using it
-    if (keyInfo.hasNewlines || keyInfo.hasSpaces) {
-      console.warn("⚠️ [Sentences API] API key had whitespace that was trimmed");
-    }
-    
-    const anthropic = new Anthropic({
-      apiKey: apiKey,
-    });
-
-    console.log("🔍 [Sentences API] Making Claude API request with:", {
-      model: "claude-sonnet-4-20250514",
-      apiKeyLength: apiKey.length,
-      apiKeyPrefix: apiKey.substring(0, 20),
-    });
 
     const prompt = `You are a helpful assistant. Based on the user's proof method and their "why", generate three sentences:
 
@@ -77,9 +43,16 @@ Why: ${why}
 
 Generate ONLY the three sentences, one per line, nothing else.`;
 
-    let message;
-    try {
-      message = await anthropic.messages.create({
+    console.log("🔍 [Sentences API] Making Claude API request via fetch...");
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 200,
         messages: [
@@ -88,33 +61,31 @@ Generate ONLY the three sentences, one per line, nothing else.`;
             content: prompt,
           },
         ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("❌ [Sentences API] Claude API failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody,
       });
-      console.log("✅ [Sentences API] Claude API request successful");
-    } catch (apiError: any) {
-      console.error("❌ [Sentences API] Claude API request failed:", {
-        status: apiError?.status,
-        statusCode: apiError?.statusCode,
-        message: apiError?.message,
-        error: apiError?.error,
-        name: apiError?.name,
-        code: apiError?.code,
-      });
-      // Re-throw to be caught by outer catch
-      throw apiError;
+      return null;
     }
 
-    console.log("Claude response:", JSON.stringify(message.content));
+    const data = await response.json();
+    const content =
+      data.content
+        ?.filter((block: any) => block.type === "text")
+        .map((block: any) => block.text)
+        .join("") || "";
 
-    // Extract the text from Claude's response
-    let content = "";
-    for (const block of message.content) {
-      if (block.type === "text") {
-        content += block.text;
-      }
-    }
+    console.log("✅ [Sentences API] Claude API request successful");
+    console.log("Claude response:", content);
 
     if (!content) {
-      console.error("No content in Claude response");
+      console.error("❌ [Sentences API] No content in Claude response");
       return null;
     }
 
@@ -151,33 +122,14 @@ Generate ONLY the three sentences, one per line, nothing else.`;
       };
     }
 
-    console.error("Could not parse sentences from Claude response:", content);
+    console.error("❌ [Sentences API] Could not parse sentences from Claude response:", content);
     return null;
   } catch (error: any) {
-    const errorStatus = error?.status || error?.statusCode;
-    const errorMessage = error?.message || String(error);
-    
     console.error("❌ [Sentences API] Error calling Claude API:", {
-      error: errorMessage,
+      error: error?.message || String(error),
       name: error?.name,
-      code: error?.code,
-      status: errorStatus,
       stack: error?.stack,
     });
-
-    // Provide specific error messages for common issues
-    if (errorStatus === 401) {
-      console.error("❌ [Sentences API] Claude API returned 401 Unauthorized. This usually means:");
-      console.error("   1. The CLAUDE_API_KEY is invalid or expired");
-      console.error("   2. The API key doesn't have the correct permissions");
-      console.error("   3. The API key format is incorrect");
-      console.error("   Please check your Netlify environment variables.");
-    } else if (errorStatus === 429) {
-      console.error("❌ [Sentences API] Claude API returned 429 Rate Limit. Too many requests.");
-    } else if (errorStatus === 500 || errorStatus === 502 || errorStatus === 503) {
-      console.error("❌ [Sentences API] Claude API server error. Please try again later.");
-    }
-    
     return null;
   }
 }
@@ -196,97 +148,34 @@ export async function GET(request: NextRequest) {
 
     console.log("✅ [Sentences API] userId received:", userId);
 
-    // Check for required environment variables early
-    const rawApiKey = process.env.CLAUDE_API_KEY;
-    
-    // Log API key info for debugging (masked for security)
-    if (rawApiKey) {
-      const apiKeyLength = rawApiKey.length;
-      const apiKeyPreview = rawApiKey.length > 20 
-        ? `${rawApiKey.substring(0, 10)}...${rawApiKey.substring(apiKeyLength - 4)}`
-        : `${rawApiKey.substring(0, Math.min(10, apiKeyLength))}...`;
-      const hasWhitespace = rawApiKey !== rawApiKey.trim();
-      
-      console.log("🔑 [Sentences API] CLAUDE_API_KEY info:", {
-        exists: true,
-        length: apiKeyLength,
-        preview: apiKeyPreview,
-        startsWith: rawApiKey.substring(0, Math.min(7, apiKeyLength)),
-        hasWhitespace: hasWhitespace,
-        trimmedLength: rawApiKey.trim().length,
-      });
-    } else {
+    // Check for Claude API key
+    if (!process.env.CLAUDE_API_KEY) {
       console.error("❌ [Sentences API] CLAUDE_API_KEY not found in environment variables");
-      console.error("❌ [Sentences API] Available env vars starting with 'CLAUDE':", 
-        Object.keys(process.env).filter(key => key.includes('CLAUDE')));
       return NextResponse.json(
-        { 
-          error: "Server configuration error: Missing API key",
-          errorCode: "MISSING_CLAUDE_API_KEY"
+        {
+          error: "Server configuration error: Missing Claude API key",
+          errorCode: "MISSING_CLAUDE_API_KEY",
         },
         { status: 500 }
       );
     }
-
-    // Validate API key format (should start with 'sk-ant-' or 'sk-')
-    const apiKey = rawApiKey.trim();
-    
-    // Check for common issues
-    const hasNewlines = rawApiKey.includes('\n') || rawApiKey.includes('\r');
-    const hasLeadingTrailingSpaces = rawApiKey !== rawApiKey.trim();
-    
-    if (hasNewlines || hasLeadingTrailingSpaces) {
-      console.warn("⚠️ [Sentences API] API key has whitespace issues:", {
-        hasNewlines,
-        hasLeadingTrailingSpaces,
-        originalLength: rawApiKey.length,
-        trimmedLength: apiKey.length,
-      });
-    }
-    
-    // Validate format - Anthropic keys can start with sk-ant-api03-, sk-ant-, or sk-
-    const isValidFormat = apiKey.startsWith('sk-ant-api03-') || 
-                          apiKey.startsWith('sk-ant-') || 
-                          apiKey.startsWith('sk-');
-    
-    if (!isValidFormat) {
-      console.error("❌ [Sentences API] CLAUDE_API_KEY appears to be invalid format");
-      console.error("❌ [Sentences API] API key preview:", apiKey.substring(0, 20) + "...");
-      console.error("❌ [Sentences API] Expected to start with 'sk-ant-api03-', 'sk-ant-', or 'sk-'");
-      return NextResponse.json(
-        { 
-          error: "Server configuration error: Invalid API key format",
-          errorCode: "INVALID_CLAUDE_API_KEY_FORMAT"
-        },
-        { status: 500 }
-      );
-    }
-    
-    console.log("✅ [Sentences API] CLAUDE_API_KEY format validated:", {
-      format: apiKey.startsWith('sk-ant-api03-') ? 'sk-ant-api03-*' : 
-              apiKey.startsWith('sk-ant-') ? 'sk-ant-*' : 'sk-*',
-      length: apiKey.length,
-    });
 
     // Check AWS credentials
     if (!process.env.AWS_ACCESS_KEY_ID_NEXT || !process.env.AWS_SECRET_ACCESS_KEY_NEXT) {
       console.error("❌ [Sentences API] AWS credentials not found in environment variables");
-      console.error("❌ [Sentences API] AWS_ACCESS_KEY_ID_NEXT present:", !!process.env.AWS_ACCESS_KEY_ID_NEXT);
-      console.error("❌ [Sentences API] AWS_SECRET_ACCESS_KEY_NEXT present:", !!process.env.AWS_SECRET_ACCESS_KEY_NEXT);
       return NextResponse.json(
-        { 
+        {
           error: "Server configuration error: Missing AWS credentials",
-          errorCode: "MISSING_AWS_CREDENTIALS"
+          errorCode: "MISSING_AWS_CREDENTIALS",
         },
         { status: 500 }
       );
     }
 
     console.log("✅ [Sentences API] Environment variables verified");
-
     console.log("🔍 [Sentences API] Fetching onboarding data for userId:", userId);
 
-    // Create DynamoDB client with verified credentials
+    // Create DynamoDB client
     const region = process.env.DYNAMODB_REGION || "us-west-1";
     const dynamoDbClient = new DynamoDBClient({
       region,
@@ -311,15 +200,11 @@ export async function GET(request: NextRequest) {
         error: dynamoError?.message || dynamoError,
         name: dynamoError?.name,
         code: dynamoError?.code,
-        userId,
-        region,
-        tableName: TableNames.ONBOARDING_CHAT,
       });
       return NextResponse.json(
-        { 
+        {
           error: "Failed to fetch onboarding data",
           errorCode: "DYNAMODB_ERROR",
-          details: dynamoError?.name || "Unknown DynamoDB error"
         },
         { status: 500 }
       );
@@ -328,10 +213,7 @@ export async function GET(request: NextRequest) {
     if (!onboardingData.Item) {
       console.error("❌ [Sentences API] Onboarding data not found for userId:", userId);
       return NextResponse.json(
-        { 
-          error: "Onboarding data not found",
-          errorCode: "ONBOARDING_DATA_NOT_FOUND"
-        },
+        { error: "Onboarding data not found", errorCode: "ONBOARDING_DATA_NOT_FOUND" },
         { status: 404 }
       );
     }
@@ -344,33 +226,23 @@ export async function GET(request: NextRequest) {
     const structuredSchedule = onboarding.structuredSchedule || {};
 
     if (!proofMethod || !why) {
-      console.error("❌ [Sentences API] Missing proofMethod or why in onboarding data:", {
-        userId,
-        hasProofMethod: !!proofMethod,
-        hasWhy: !!why,
-      });
+      console.error("❌ [Sentences API] Missing proofMethod or why in onboarding data");
       return NextResponse.json(
-        { 
-          error: "Missing proofMethod or why in onboarding data",
-          errorCode: "MISSING_ONBOARDING_FIELDS"
-        },
+        { error: "Missing proofMethod or why in onboarding data", errorCode: "MISSING_ONBOARDING_FIELDS" },
         { status: 400 }
       );
     }
 
     console.log("🔍 [Sentences API] Generating sentences with Claude...");
 
-    // Generate sentences using Claude
     const sentences = await generateSentencesWithClaude(proofMethod, why);
 
     if (!sentences) {
       console.error("❌ [Sentences API] Failed to generate sentences");
-      // Check if it was a 401 error (we log it in the function, but need to return appropriate error)
       return NextResponse.json(
-        { 
-          error: "Failed to generate sentences. Please check Claude API key configuration.",
+        {
+          error: "Failed to generate sentences",
           errorCode: "CLAUDE_GENERATION_FAILED",
-          hint: "This is usually caused by an invalid or missing CLAUDE_API_KEY in Netlify environment variables"
         },
         { status: 500 }
       );
@@ -378,20 +250,16 @@ export async function GET(request: NextRequest) {
 
     console.log("✅ [Sentences API] Sentences generated successfully");
 
-    // Calculate monthly amount based on submission frequency
-    // For a 30-day month, calculate based on schedule days per week
+    // Calculate monthly submissions based on schedule
     const scheduleDays = structuredSchedule.days || [];
     const frequency = structuredSchedule.frequency || "weekly";
-    
+
     let monthlySubmissions = 0;
     if (frequency === "weekly" && scheduleDays.length > 0) {
-      // Weekly frequency: days per week * 4.33 weeks per month
       monthlySubmissions = Math.round(scheduleDays.length * 4.33);
     } else if (frequency === "daily") {
-      // Daily frequency: 30 days per month
       monthlySubmissions = 30;
     } else {
-      // Default: assume 3 days per week if we can't determine
       monthlySubmissions = Math.round(3 * 4.33);
     }
 
@@ -404,25 +272,18 @@ export async function GET(request: NextRequest) {
         sentence2: sentences.sentence2,
         sentence3: sentences.sentence3,
       },
-      monthlySubmissions: monthlySubmissions,
-      scheduleDays: scheduleDays,
-      frequency: frequency,
+      monthlySubmissions,
+      scheduleDays,
+      frequency,
     });
   } catch (error: any) {
     const duration = Date.now() - startTime;
     console.error("❌ [Sentences API] Unexpected error after", duration, "ms:", {
       error: error?.message || error,
       stack: error?.stack,
-      name: error?.name,
-      code: error?.code,
-      type: typeof error,
     });
     return NextResponse.json(
-      { 
-        error: "Failed to generate sentences",
-        errorCode: "UNEXPECTED_ERROR",
-        details: process.env.NODE_ENV === "development" ? error?.message : undefined
-      },
+      { error: "Failed to generate sentences", errorCode: "UNEXPECTED_ERROR" },
       { status: 500 }
     );
   }
