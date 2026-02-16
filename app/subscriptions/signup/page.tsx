@@ -570,9 +570,17 @@ function SignupContent() {
       console.log(`🔍 [Signup Page] Fetching onboarding sentences for userId: ${userId}`);
 
       fetch(`/api/onboarding/sentences?userId=${userId}`)
-        .then((res) => {
+        .then(async (res) => {
           if (!res.ok) {
-            throw new Error("Failed to fetch sentences");
+            const errorData = await res.json().catch(() => ({}));
+            console.error("❌ [Signup Page] API error response:", {
+              status: res.status,
+              statusText: res.statusText,
+              error: errorData.error,
+              errorCode: errorData.errorCode,
+              details: errorData.details,
+            });
+            throw new Error(errorData.error || "Failed to fetch sentences");
           }
           return res.json();
         })
