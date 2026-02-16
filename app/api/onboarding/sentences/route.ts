@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dynamoDb, TableNames } from "@/services/aws/dynamodb";
+import { TableNames } from "@/services/aws/dynamodb";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import Anthropic from "@anthropic-ai/sdk";
 
 // Force Node.js runtime for Netlify compatibility
@@ -148,6 +150,17 @@ export async function GET(request: NextRequest) {
 
     console.log("🔍 [Sentences API] Fetching onboarding data for userId:", userId);
 
+    // Create DynamoDB client with verified credentials
+    const region = process.env.DYNAMODB_REGION || "us-west-1";
+    const dynamoDbClient = new DynamoDBClient({
+      region,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID_NEXT,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY_NEXT,
+      },
+    });
+    const dynamoDb = DynamoDBDocumentClient.from(dynamoDbClient);
+
     // Fetch onboarding data
     let onboardingData;
     try {
@@ -163,6 +176,7 @@ export async function GET(request: NextRequest) {
         name: dynamoError?.name,
         code: dynamoError?.code,
         userId,
+        region,
       });
       return NextResponse.json(
         { error: "Failed to fetch onboarding data" },
