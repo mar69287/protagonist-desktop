@@ -47,6 +47,12 @@ async function generateSentencesWithClaude(
       apiKey: apiKey,
     });
 
+    console.log("🔍 [Sentences API] Making Claude API request with:", {
+      model: "claude-sonnet-4-20250514",
+      apiKeyLength: apiKey.length,
+      apiKeyPrefix: apiKey.substring(0, 20),
+    });
+
     const prompt = `You are a helpful assistant. Based on the user's proof method and their "why", generate three sentences:
 
 1. First sentence: "Each day you upload proof of [action]. I'll check it."
@@ -71,16 +77,31 @@ Why: ${why}
 
 Generate ONLY the three sentences, one per line, nothing else.`;
 
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 200,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    });
+    let message;
+    try {
+      message = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 200,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+      });
+      console.log("✅ [Sentences API] Claude API request successful");
+    } catch (apiError: any) {
+      console.error("❌ [Sentences API] Claude API request failed:", {
+        status: apiError?.status,
+        statusCode: apiError?.statusCode,
+        message: apiError?.message,
+        error: apiError?.error,
+        name: apiError?.name,
+        code: apiError?.code,
+      });
+      // Re-throw to be caught by outer catch
+      throw apiError;
+    }
 
     console.log("Claude response:", JSON.stringify(message.content));
 
