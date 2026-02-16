@@ -7,11 +7,6 @@ import Anthropic from "@anthropic-ai/sdk";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Initialize Anthropic client
-const anthropic = new Anthropic({
-  apiKey: process.env.CLAUDE_API_KEY,
-});
-
 async function generateSentencesWithClaude(
   proofMethod: string,
   why: string
@@ -21,6 +16,11 @@ async function generateSentencesWithClaude(
       console.error("CLAUDE_API_KEY not found in environment variables");
       return null;
     }
+
+    // Initialize Anthropic client lazily to avoid initialization errors
+    const anthropic = new Anthropic({
+      apiKey: process.env.CLAUDE_API_KEY,
+    });
 
     const prompt = `You are a helpful assistant. Based on the user's proof method and their "why", generate three sentences:
 
@@ -107,8 +107,14 @@ Generate ONLY the three sentences, one per line, nothing else.`;
 
     console.error("Could not parse sentences from Claude response:", content);
     return null;
-  } catch (error) {
-    console.error("Error calling Claude API:", error);
+  } catch (error: any) {
+    console.error("❌ [Sentences API] Error calling Claude API:", {
+      error: error?.message || error,
+      name: error?.name,
+      code: error?.code,
+      status: error?.status,
+      stack: error?.stack,
+    });
     return null;
   }
 }
@@ -122,15 +128,50 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }
 
+    // Check for required environment variables early
+    if (!process.env.CLAUDE_API_KEY) {
+      console.error("❌ [Sentences API] CLAUDE_API_KEY not found in environment variables");
+      return NextResponse.json(
+        { error: "Server configuration error: Missing API key" },
+        { status: 500 }
+      );
+    }
+
+    // Check AWS credentials
+    if (!process.env.AWS_ACCESS_KEY_ID_NEXT || !process.env.AWS_SECRET_ACCESS_KEY_NEXT) {
+      console.error("❌ [Sentences API] AWS credentials not found in environment variables");
+      return NextResponse.json(
+        { error: "Server configuration error: Missing AWS credentials" },
+        { status: 500 }
+      );
+    }
+
+    console.log("🔍 [Sentences API] Fetching onboarding data for userId:", userId);
+
     // Fetch onboarding data
-    const onboardingData = await dynamoDb.send(
-      new GetCommand({
-        TableName: TableNames.ONBOARDING_CHAT,
-        Key: { userId: userId },
-      })
-    );
+    let onboardingData;
+    try {
+      onboardingData = await dynamoDb.send(
+        new GetCommand({
+          TableName: TableNames.ONBOARDING_CHAT,
+          Key: { userId: userId },
+        })
+      );
+    } catch (dynamoError: any) {
+      console.error("❌ [Sentences API] DynamoDB error:", {
+        error: dynamoError?.message || dynamoError,
+        name: dynamoError?.name,
+        code: dynamoError?.code,
+        userId,
+      });
+      return NextResponse.json(
+        { error: "Failed to fetch onboarding data" },
+        { status: 500 }
+      );
+    }
 
     if (!onboardingData.Item) {
+      console.error("❌ [Sentences API] Onboarding data not found for userId:", userId);
       return NextResponse.json(
         { error: "Onboarding data not found" },
         { status: 404 }
@@ -143,16 +184,24 @@ export async function GET(request: NextRequest) {
     const structuredSchedule = onboarding.structuredSchedule || {};
 
     if (!proofMethod || !why) {
+      console.error("❌ [Sentences API] Missing proofMethod or why in onboarding data:", {
+        userId,
+        hasProofMethod: !!proofMethod,
+        hasWhy: !!why,
+      });
       return NextResponse.json(
         { error: "Missing proofMethod or why in onboarding data" },
         { status: 400 }
       );
     }
 
+    console.log("🔍 [Sentences API] Generating sentences with Claude...");
+
     // Generate sentences using Claude
     const sentences = await generateSentencesWithClaude(proofMethod, why);
 
     if (!sentences) {
+      console.error("❌ [Sentences API] Failed to generate sentences");
       return NextResponse.json(
         { error: "Failed to generate sentences" },
         { status: 500 }
@@ -176,6 +225,8 @@ export async function GET(request: NextRequest) {
       monthlySubmissions = Math.round(3 * 4.33);
     }
 
+    console.log("✅ [Sentences API] Successfully generated sentences");
+
     return NextResponse.json({
       sentences: {
         sentence1: sentences.sentence1,
@@ -186,10 +237,17 @@ export async function GET(request: NextRequest) {
       scheduleDays: scheduleDays,
       frequency: frequency,
     });
-  } catch (error) {
-    console.error("Error generating sentences:", error);
+  } catch (error: any) {
+    console.error("❌ [Sentences API] Unexpected error:", {
+      error: error?.message || error,
+      stack: error?.stack,
+      name: error?.name,
+    });
     return NextResponse.json(
-      { error: "Failed to generate sentences" },
+      { 
+        error: "Failed to generate sentences",
+        details: process.env.NODE_ENV === "development" ? error?.message : undefined
+      },
       { status: 500 }
     );
   }
