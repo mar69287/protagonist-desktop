@@ -286,8 +286,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate refund based on submissionCalendar completed count
+    // Check if user has subscriptionType to determine which refund method to use
+    const hasSubscriptionType = user.subscriptionType != null && user.subscriptionType !== '';
+    
+    console.log(
+      `📊 Refund calculation method: ${isTrialCheck ? 'Trial' : hasSubscriptionType ? 'New (per-submission)' : 'Legacy (percentage-based)'}`
+    );
+    if (!isTrialCheck) {
+      console.log(
+        `   User subscriptionType: ${user.subscriptionType || 'not set (using legacy)'}`
+      );
+    }
+    
     const refundCalculation = isTrialCheck
       ? calculateTrialRefund(allRelevantSubmissions.length, completedCount)
+      : hasSubscriptionType
+      ? await calculateRefundFromSubmissionsNew(
+          allRelevantSubmissions.length,
+          completedCount,
+          user.stripeSubscriptionId,
+          isFirstBillingCycle
+        )
       : calculateRefundFromSubmissions(
           allRelevantSubmissions.length,
           completedCount,
@@ -453,7 +472,122 @@ function calculateTrialRefund(
 }
 
 /**
- * Calculate refund based on submission completion rate
+ * Calculate refund for NEW subscription types (per-submission based)
+ * 
+ * Calculation:
+ * - Get subscription price from Stripe
+ * - Refund per submission = price ÷ total submissions
+ * - Refund amount = verified submissions × refund per submission
+ * - First billing cycle: Add $10 bonus (separate from submission count)
+ * 
+ * Note: If 0 submissions expected in period, refund is $0 (or $10 bonus if first month)
+ */
+async function calculateRefundFromSubmissionsNew(
+  totalExpected: number,
+  verifiedCount: number,
+  subscriptionId: string | null | undefined,
+  isFirstBillingCycle: boolean
+): Promise<{
+  totalExpected: number;
+  successfulSubmissions: number;
+  missedSubmissions: number;
+  completionRate: number;
+  refundAmount: number;
+  isFirstBillingCycle: boolean;
+}> {
+  const missedSubmissions = totalExpected - verifiedCount;
+  
+  // Calculate completion rate
+  const completionRate =
+    totalExpected > 0 ? (verifiedCount / totalExpected) * 100 : 0;
+
+  let refundAmount = 0;
+  let monthlyPrice = 0;
+
+  if (!subscriptionId) {
+    console.warn('⚠️ No subscription ID provided for new refund calculation');
+    return {
+      totalExpected,
+      successfulSubmissions: verifiedCount,
+      missedSubmissions,
+      completionRate,
+      refundAmount: isFirstBillingCycle ? 10 : 0, // $10 bonus if first month, otherwise $0
+      isFirstBillingCycle,
+    };
+  }
+
+  try {
+    // Get subscription from Stripe to get the price
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['items.data.price'],
+    });
+
+    // Get the first subscription item's price
+    const subscriptionItem = subscription.items?.data?.[0];
+    if (subscriptionItem?.price?.unit_amount) {
+      monthlyPrice = subscriptionItem.price.unit_amount / 100; // Convert cents to dollars
+    } else {
+      console.warn('⚠️ Could not find price in subscription');
+      return {
+        totalExpected,
+        successfulSubmissions: verifiedCount,
+        missedSubmissions,
+        completionRate,
+        refundAmount: isFirstBillingCycle ? 10 : 0, // $10 bonus if first month, otherwise $0
+        isFirstBillingCycle,
+      };
+    }
+
+    // Calculate base refund from submissions
+    if (totalExpected === 0) {
+      // No submissions expected in the period
+      refundAmount = 0;
+      console.log(
+        `New refund calculation: No submissions expected in period - $0 base refund`
+      );
+    } else {
+      // Calculate refund per submission: price ÷ total submissions
+      const refundPerSubmission = monthlyPrice / totalExpected;
+      // Refund amount = verified submissions × refund per submission
+      refundAmount = verifiedCount * refundPerSubmission;
+
+      console.log(
+        `New refund calculation: ${verifiedCount}/${totalExpected} verified submissions - $${monthlyPrice} ÷ ${totalExpected} = $${refundPerSubmission.toFixed(2)} per submission - Base refund: $${refundAmount.toFixed(2)}`
+      );
+    }
+
+    // Add $10 bonus for first billing cycle (separate from submission count)
+    if (isFirstBillingCycle) {
+      const bonusAmount = 10;
+      refundAmount += bonusAmount;
+      console.log(
+        `New refund calculation: First billing cycle - Adding $${bonusAmount} bonus. Total refund: $${refundAmount.toFixed(2)}`
+      );
+    }
+  } catch (error) {
+    console.error('Error fetching subscription for new refund calculation:', error);
+    return {
+      totalExpected,
+      successfulSubmissions: verifiedCount,
+      missedSubmissions,
+      completionRate,
+      refundAmount: isFirstBillingCycle ? 10 : 0, // $10 bonus if first month, otherwise $0
+      isFirstBillingCycle,
+    };
+  }
+
+  return {
+    totalExpected,
+    successfulSubmissions: verifiedCount,
+    missedSubmissions,
+    completionRate,
+    refundAmount: Math.round(refundAmount * 100) / 100, // Round to 2 decimal places
+    isFirstBillingCycle,
+  };
+}
+
+/**
+ * Calculate refund based on submission completion rate (LEGACY - for users without subscriptionType)
  *
  * Calculation:
  * - Total Expected: All submissions with passed deadlines in billing period
@@ -496,7 +630,14 @@ function calculateRefundFromSubmissions(
 
   if (isFirstBillingCycle) {
     // First billing cycle refund logic (with $10 bonus for all users)
-    if (completionRate >= 90) {
+    // The $10 bonus is separate from submission count - they get it no matter what
+    if (totalExpected === 0) {
+      // No submissions expected, but still give $10 bonus for first month
+      refundAmount = 10;
+      console.log(
+        `Legacy refund calculation: No submissions expected in period - $10 bonus only (first month)`
+      );
+    } else if (completionRate >= 90) {
       refundAmount = 98 + 10; // $108 total
     } else if (completionRate >= 70) {
       refundAmount = 49 + 10; // $59 total
@@ -507,7 +648,12 @@ function calculateRefundFromSubmissions(
     }
   } else {
     // Subsequent billing cycles refund logic
-    if (completionRate >= 90) {
+    if (totalExpected === 0) {
+      refundAmount = 0; // No submissions expected, no refund
+      console.log(
+        `Legacy refund calculation: No submissions expected in period - $0 refund`
+      );
+    } else if (completionRate >= 90) {
       refundAmount = 50;
     } else if (completionRate >= 70) {
       refundAmount = 25;

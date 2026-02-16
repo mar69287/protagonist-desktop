@@ -128,7 +128,10 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     // Fetch the full subscription from Stripe API to ensure we have complete data
     // The webhook event sometimes has incomplete data
     const fullSubscription = await stripe.subscriptions.retrieve(
-      subscription.id
+      subscription.id,
+      {
+        expand: ['items.data.price.product'],
+      }
     );
     console.log({ fullSubscription });
     console.log({ subscription });
@@ -200,6 +203,32 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       `Using actualPeriodStart=${actualPeriodStart ? new Date(actualPeriodStart * 1000).toISOString() : 'null'}, actualPeriodEnd=${actualPeriodEnd ? new Date(actualPeriodEnd * 1000).toISOString() : 'null'}`
     );
 
+    // Extract subscription type (product name) from subscription items
+    let subscriptionType: string | null = null;
+    try {
+      const subscriptionItem = fullSubscription.items?.data?.[0];
+      if (subscriptionItem?.price) {
+        const price = subscriptionItem.price;
+        // Product can be a string ID or an expanded Product object
+        if (typeof price.product === 'string') {
+          // If product is just an ID, fetch it
+          try {
+            const product = await stripe.products.retrieve(price.product);
+            subscriptionType = product.name || null;
+          } catch (err) {
+            console.warn(`⚠️ Could not fetch product ${price.product}:`, err);
+          }
+        } else if (price.product && typeof price.product === 'object') {
+          // Product is already expanded
+          subscriptionType = (price.product as any).name || null;
+        }
+      }
+    } catch (error) {
+      console.error('Error extracting subscription type:', error);
+    }
+
+    console.log(`Subscription type: ${subscriptionType || 'not found'}`);
+
     await dynamoDb.send(
       new UpdateCommand({
         TableName: TableNames.USERS,
@@ -208,6 +237,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
           SET stripeCustomerId = :customerId,
               stripeSubscriptionId = :subscriptionId,
               subscriptionStatus = :status,
+              subscriptionType = :subscriptionType,
               currentPeriodStart = :periodStart,
               currentPeriodEnd = :periodEnd,
               cancelAtPeriodEnd = :cancelAtPeriodEnd,
@@ -220,6 +250,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
               : fullSubscription.customer?.id || null,
           ":subscriptionId": fullSubscription.id,
           ":status": fullSubscription.status,
+          ":subscriptionType": subscriptionType,
           ":periodStart": actualPeriodStart
             ? new Date(actualPeriodStart * 1000).toISOString()
             : new Date().toISOString(),
@@ -453,6 +484,39 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 
   try {
+    // Fetch full subscription with expanded product data
+    const fullSubscription = await stripe.subscriptions.retrieve(
+      subscription.id,
+      {
+        expand: ['items.data.price.product'],
+      }
+    );
+
+    // Extract subscription type (product name) from subscription items
+    let subscriptionType: string | null = null;
+    try {
+      const subscriptionItem = fullSubscription.items?.data?.[0];
+      if (subscriptionItem?.price) {
+        const price = subscriptionItem.price;
+        // Product can be a string ID or an expanded Product object
+        if (typeof price.product === 'string') {
+          // If product is just an ID, fetch it
+          try {
+            const product = await stripe.products.retrieve(price.product);
+            subscriptionType = product.name || null;
+          } catch (err) {
+            console.warn(`⚠️ Could not fetch product ${price.product}:`, err);
+          }
+        } else if (price.product && typeof price.product === 'object') {
+          // Product is already expanded
+          subscriptionType = (price.product as any).name || null;
+        }
+      }
+    } catch (error) {
+      console.error('Error extracting subscription type:', error);
+    }
+
+    console.log(`Subscription type: ${subscriptionType || 'not found'}`);
     // Access period dates from the subscription object directly
     // Using type assertion as these properties exist but aren't in the type definition
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -477,9 +541,10 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     );
 
     // Build update expression dynamically - only update period dates if they exist in the webhook
-    let updateExpression = `SET subscriptionStatus = :status, cancelAtPeriodEnd = :cancelAtPeriodEnd, updatedAt = :updatedAt`;
+    let updateExpression = `SET subscriptionStatus = :status, subscriptionType = :subscriptionType, cancelAtPeriodEnd = :cancelAtPeriodEnd, updatedAt = :updatedAt`;
     const expressionAttributeValues: Record<string, any> = {
       ":status": subscription.status,
+      ":subscriptionType": subscriptionType,
       ":cancelAtPeriodEnd": cancelAtPeriodEnd ?? false,
       ":updatedAt": new Date().toISOString(),
     };

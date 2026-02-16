@@ -14,7 +14,16 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, email, useTrial = true } = await request.json();
+    const { userId, email, useTrial = true, isFirstSubscription = true, selectedPriceId } = await request.json();
+    
+    console.log(`🚀 [Checkout Session API] Creating checkout session`);
+    console.log(`📋 [Checkout Session API] Parameters:`, {
+      userId,
+      email,
+      useTrial,
+      isFirstSubscription,
+      selectedPriceId,
+    });
 
     if (!userId) {
       return NextResponse.json(
@@ -23,20 +32,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the price IDs from environment variables
-    const priceId = process.env.STRIPE_PRICE_ID; // $98/month recurring
+    // Price IDs based on subscription status
+    // First subscription: uses STRIPE_PRICE_ID (first month price)
+    // Second+ subscription: user can choose from three prices
+    const firstMonthPriceId = process.env.STRIPE_PRICE_ID; // First month price
+    const secondMonthPriceId1 = process.env.STRIPE_SUBSCRIPTION_OPTION_1_PRICE_ID; // Second+ subscription option 1
+    const secondMonthPriceId2 = process.env.STRIPE_SUBSCRIPTION_OPTION_2_PRICE_ID; // Second+ subscription option 2
+    const secondMonthPriceId3 = process.env.STRIPE_SUBSCRIPTION_OPTION_3_PRICE_ID; // Second+ subscription option 3
 
-    if (!priceId) {
-      throw new Error("STRIPE_PRICE_ID is not configured");
-    }
+    // Build line items based on subscription status and trial selection
+    const lineItems: Array<{ price: string; quantity: number }> = [];
 
-    // Build line items based on trial selection
-    const lineItems = [
-      {
-        price: priceId, // $98/month recurring price
+    if (isFirstSubscription) {
+      // First subscription: only use the first price
+      console.log(`🎯 [Checkout Session API] First subscription detected - using only first price: ${firstMonthPriceId}`);
+      if (!firstMonthPriceId) {
+        throw new Error("STRIPE_PRICE_ID is not configured");
+      }
+      lineItems.push({
+        price: firstMonthPriceId,
         quantity: 1,
-      },
-    ];
+      });
+    } else {
+      // Second+ subscription: use the selected price ID
+      if (!selectedPriceId) {
+        throw new Error("selectedPriceId is required for second+ subscriptions");
+      }
+      console.log(`🎯 [Checkout Session API] Second+ subscription detected - using selected price: ${selectedPriceId}`);
+      
+      // Validate that the selected price is one of the allowed options
+      const allowedPriceIds = [firstMonthPriceId, secondMonthPriceId1, secondMonthPriceId2, secondMonthPriceId3].filter(Boolean);
+      if (!allowedPriceIds.includes(selectedPriceId)) {
+        throw new Error(`Invalid price ID: ${selectedPriceId}. Must be one of: ${allowedPriceIds.join(", ")}`);
+      }
+      
+      lineItems.push({
+        price: selectedPriceId,
+        quantity: 1,
+      });
+    }
 
     // Add trial fee if user selected trial option
     if (useTrial) {

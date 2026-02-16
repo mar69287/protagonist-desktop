@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
     "@aws-amplify/adapter-nextjs": "^1.7.0",
     "@aws-amplify/core": "^6.15.1",
     "@aws-sdk/client-dynamodb": "^3.926.0",

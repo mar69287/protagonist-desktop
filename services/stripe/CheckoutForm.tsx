@@ -17,12 +17,16 @@ interface CheckoutFormProps {
   userId: string;
   email?: string;
   useTrial?: boolean;
+  isFirstSubscription?: boolean;
+  selectedPriceId?: string;
 }
 
 export default function CheckoutForm({
   userId,
   email,
   useTrial = true,
+  isFirstSubscription = true,
+  selectedPriceId,
 }: CheckoutFormProps) {
   const fetchClientSecret = useCallback(async () => {
     // Call your API to create a checkout session
@@ -32,12 +36,12 @@ export default function CheckoutForm({
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ userId, email, useTrial }),
+      body: JSON.stringify({ userId, email, useTrial, isFirstSubscription, selectedPriceId }),
     });
 
     const data = await response.json();
     return data.clientSecret;
-  }, [userId, email, useTrial]);
+  }, [userId, email, useTrial, isFirstSubscription, selectedPriceId]);
 
   const options = {
     fetchClientSecret,

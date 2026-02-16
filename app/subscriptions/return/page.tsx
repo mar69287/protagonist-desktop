@@ -188,7 +188,7 @@ function ReturnPageContent() {
               {customerEmail}
             </p>
 
-            <div
+            {/* <div
               style={{
                 backgroundColor: "rgba(0,0,0,0.3)",
                 borderRadius: "16px",
@@ -337,7 +337,7 @@ function ReturnPageContent() {
                 </div>
               </div>
 
-              {/* <div
+              <div
                 style={{
                   marginTop: "24px",
                   paddingTop: "24px",
@@ -396,8 +396,8 @@ function ReturnPageContent() {
                     <span style={{ color: "#22c55e" }}>$50 back (max)</span>
                   </div>
                 </div>
-              </div> */}
-            </div>
+              </div>
+            </div> */}
           </NeumorphicCard>
 
           {/* <Link
