@@ -176,6 +176,10 @@ function NeumorphicCard({
   );
 }
 
+// Feature flag: Set to true to enable HERO and LEGEND modes for second+ subscriptions
+// Set to false to lock them (currently locked while app features are being developed)
+const ENABLE_HIGHER_TIERS = false;
+
 // Price IDs for second+ subscriptions - fetched from environment variables
 const getSecondMonthPriceIds = () => {
   const priceId1 = process.env.NEXT_PUBLIC_STRIPE_SUBSCRIPTION_OPTION_1_PRICE_ID;
@@ -861,7 +865,8 @@ function SignupContent() {
                       { name: "LEGEND MODE", perDay: "$3+", price: 90, mode: 3 as const },
                     ].map((tier) => {
                       const isSelected = selectedMode === tier.mode;
-                      const isLocked = isFirstSubscription && tier.mode > 1;
+                      // Lock higher tiers (2, 3) if: first subscription OR higher tiers feature is disabled
+                      const isLocked = tier.mode > 1 && (isFirstSubscription || !ENABLE_HIGHER_TIERS);
 
                       return (
                         <div
@@ -1757,36 +1762,38 @@ function SignupContent() {
                     </motion.button>
 
                     {/* Not Ready Yet Button - Only show for first subscription */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
-                      className="mt-6 text-center"
-                    >
-                      <button
-                        onClick={() => {
-                          setUseTrial(true);
-                          setShowTrialOption(true);
-                          setAgreedToTerms(false);
-                        }}
-                        style={{
-                          color: "#888888",
-                          fontSize: "14px",
-                          fontWeight: 500,
-                          fontFamily:
-                            "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                          textDecoration: "underline",
-                          transition: "color 0.2s ease",
-                          cursor: "pointer",
-                          background: "none",
-                          border: "none",
-                          padding: "8px",
-                        }}
-                        className="hover:text-[#b0b0b0]"
+                    {isFirstSubscription && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="mt-6 text-center"
                       >
-                        Not ready yet? Try our 3-day trial for $3
-                      </button>
-                    </motion.div>
+                        <button
+                          onClick={() => {
+                            setUseTrial(true);
+                            setShowTrialOption(true);
+                            setAgreedToTerms(false);
+                          }}
+                          style={{
+                            color: "#888888",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            fontFamily:
+                              "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                            textDecoration: "underline",
+                            transition: "color 0.2s ease",
+                            cursor: "pointer",
+                            background: "none",
+                            border: "none",
+                            padding: "8px",
+                          }}
+                          className="hover:text-[#b0b0b0]"
+                        >
+                          Not ready yet? Try our 3-day trial for $3
+                        </button>
+                      </motion.div>
+                    )}
                   </NeumorphicCard>
                 </motion.div>
               )}
