@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 
 async function generateSentencesWithClaude(
   proofMethod: string,
-  why: string
+  why: string,
+  goal: string
 ): Promise<{ sentence1: string; sentence2: string; sentence3: string } | null> {
   try {
     const apiKey = process.env.CLAUDE_API_KEY?.trim();
@@ -19,27 +20,53 @@ async function generateSentencesWithClaude(
       return null;
     }
 
-    const prompt = `You are a helpful assistant. Based on the user's proof method and their "why", generate three sentences:
+    const prompt = `You are a helpful assistant. Based on the user's proof method, goal, and their "why", generate three sentences.
 
-1. First sentence: "Each day you upload proof of [action]. I'll check it."
-   - Use the proofMethod to create a grammatically correct sentence
-   - Don't literally insert the proofMethod text, but create a natural sentence based on it
+CRITICAL REQUIREMENTS FOR ALL SENTENCES:
+- Be CONCISE: Keep sentences short and to the point. Avoid unnecessary words.
+- Make SENSE: The sentence must be logical and clear. Read it back to ensure it flows naturally.
+- Be GRAMMATICALLY CORRECT: Use proper grammar, spelling, and punctuation. Double-check your work.
+
+1. First sentence: "Each day you upload [simple description]. I'll check it."
+   - Use the proofMethod to create a simple, concise sentence
+   - Keep it short and natural - just describe what they upload, don't over-explain
+   - Extract the core action/item from the proofMethod and make it simple
    - End with "I'll check it."
-   - Example: If proofMethod is "Screenshot of the certification programs you researched (browser tabs, notes, website pages)", generate "Each day you upload proof of researching certification programs. I'll check it."
-   - Example: If proofMethod is "photo of workout", generate "Each day you upload proof of completing your workout. I'll check it."
-   - Example: If proofMethod is "screenshot", generate "Each day you upload proof of your progress. I'll check it."
+   - Example: If proofMethod is "Photo of your home-cooked meal or restaurant receipt showing it's not fast food", generate "Each day you upload a picture of your meal. I'll check it."
+   - Example: If proofMethod is "Screenshot of the certification programs you researched (browser tabs, notes, website pages)", generate "Each day you upload a screenshot of your research. I'll check it."
+   - Example: If proofMethod is "photo of workout", generate "Each day you upload a picture of your workout. I'll check it."
+   - Example: If proofMethod is "screenshot", generate "Each day you upload a screenshot. I'll check it."
+   - Keep it simple: "Each day you upload [a/an] [simple noun phrase]. I'll check it."
+   - Don't say "proof of photographing" or "proof of taking" - just say "a picture" or "a photo" or "a screenshot"
 
 2. Second sentence: "If something seems off, a human reviews it."
    - This sentence is always the same, just return it exactly as written
+   - Make sure it's grammatically correct: "If something seems off, a human reviews it."
 
-3. Third sentence: "Because not [big overarching goal/why it matters] is worth putting something real on the line"
-   - Use the "why" to fill in the overarching goal
-   - Make it natural and meaningful
-   - Example: If why is "to have more fulfillment and grow beyond stagnant fitness coaching", generate "Because not pursuing fulfillment and growth beyond stagnant fitness coaching is worth putting something real on the line"
-   - Example: If why is "I want to be healthy", generate "Because not prioritizing your health is worth putting something real on the line"
+3. Third sentence: "Because [the why/positive outcome] is worth putting something real on the line"
+   - Use ONLY the "why" to create a meaningful sentence about the deeper motivation
+   - UNDERSTANDING THE "WHY": The "why" is the reason/motivation someone wants to reach their goal. It's why they're putting money into this app - to ensure they achieve this important outcome. The sentence means: "Because [failing to achieve this important outcome] is worth putting money on the line to avoid" - meaning the outcome is so important that you're willing to risk money to ensure you achieve it.
+   - The sentence should make logical sense: you're putting money on the line BECAUSE you don't want to fail at achieving your "why"
+   - Make it natural and meaningful, focusing on the deeper motivation (the "why")
+   - IMPORTANT: Only use the "why" - do NOT mention the goal in this sentence
+   - IMPORTANT: The sentence must make sense logically. If the "why" is "to show up right for my wedding", the sentence should be about achieving that outcome and being worth putting money on the line
+   - Example: If why is "to have more fulfillment and grow beyond stagnant fitness coaching", generate "Because pursuing fulfillment and growth beyond stagnant fitness coaching is worth putting something real on the line"
+   - Example: If why is "I want to be healthy", generate "Because prioritizing your health is worth putting something real on the line"
+   - Example: If why is "to show up right for my wedding next year", generate "Because showing up right for your wedding next year is worth putting something real on the line" (NOT "not looking good" - the why is about showing up right, so the sentence should be about not achieving that)
+   - The sentence should feel personal and focus on the deeper motivation
+   - Read the sentence back: Does it make sense that someone would put money on the line to avoid failing at this outcome?
 
+Goal: ${goal}
 Proof Method: ${proofMethod}
 Why: ${why}
+
+FINAL CHECKLIST before generating:
+- Are all sentences concise (short and to the point)?
+- Do all sentences make logical sense when read? (Especially sentence 3 - does it make sense that someone would put money on the line to avoid failing at this outcome?)
+- Is the grammar correct in all three sentences?
+- Did you use ONLY the "why" in sentence 3 (not the goal)?
+- Does sentence 3 correctly interpret the "why" as the reason/motivation for putting money on the line?
+- Are the sentences natural and easy to read?
 
 Generate ONLY the three sentences, one per line, nothing else.`;
 
@@ -223,19 +250,27 @@ export async function GET(request: NextRequest) {
     const onboarding = onboardingData.Item;
     const proofMethod = onboarding.proofMethod || "";
     const why = onboarding.why || "";
+    const goal = onboarding.goal || "";
     const structuredSchedule = onboarding.structuredSchedule || {};
 
-    if (!proofMethod || !why) {
-      console.error("❌ [Sentences API] Missing proofMethod or why in onboarding data");
+    console.log("📋 [Sentences API] Extracted onboarding data:", {
+      goal,
+      why,
+      proofMethod,
+    });
+
+    if (!proofMethod || !why || !goal) {
+      console.error("❌ [Sentences API] Missing proofMethod, why, or goal in onboarding data");
       return NextResponse.json(
-        { error: "Missing proofMethod or why in onboarding data", errorCode: "MISSING_ONBOARDING_FIELDS" },
+        { error: "Missing proofMethod, why, or goal in onboarding data", errorCode: "MISSING_ONBOARDING_FIELDS" },
         { status: 400 }
       );
     }
 
     console.log("🔍 [Sentences API] Generating sentences with Claude...");
+    console.log("📝 [Sentences API] Sending to Claude - Goal:", goal, "| Why:", why, "| ProofMethod:", proofMethod);
 
-    const sentences = await generateSentencesWithClaude(proofMethod, why);
+    const sentences = await generateSentencesWithClaude(proofMethod, why, goal);
 
     if (!sentences) {
       console.error("❌ [Sentences API] Failed to generate sentences");
@@ -272,6 +307,7 @@ export async function GET(request: NextRequest) {
         sentence2: sentences.sentence2,
         sentence3: sentences.sentence3,
       },
+      goal,
       monthlySubmissions,
       scheduleDays,
       frequency,
