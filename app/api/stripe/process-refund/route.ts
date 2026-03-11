@@ -478,9 +478,8 @@ function calculateTrialRefund(
  * - Get subscription price from Stripe
  * - Refund per submission = price ÷ total submissions
  * - Refund amount = verified submissions × refund per submission
- * - First billing cycle: Add $10 bonus (separate from submission count)
  * 
- * Note: If 0 submissions expected in period, refund is $0 (or $10 bonus if first month)
+ * Note: If 0 submissions expected in period, refund is $0
  */
 async function calculateRefundFromSubmissionsNew(
   totalExpected: number,
@@ -511,7 +510,7 @@ async function calculateRefundFromSubmissionsNew(
       successfulSubmissions: verifiedCount,
       missedSubmissions,
       completionRate,
-      refundAmount: isFirstBillingCycle ? 10 : 0, // $10 bonus if first month, otherwise $0
+      refundAmount: 0,
       isFirstBillingCycle,
     };
   }
@@ -533,17 +532,17 @@ async function calculateRefundFromSubmissionsNew(
         successfulSubmissions: verifiedCount,
         missedSubmissions,
         completionRate,
-        refundAmount: isFirstBillingCycle ? 10 : 0, // $10 bonus if first month, otherwise $0
+        refundAmount: 0,
         isFirstBillingCycle,
       };
     }
 
-    // Calculate base refund from submissions
+    // Calculate refund from submissions
     if (totalExpected === 0) {
       // No submissions expected in the period
       refundAmount = 0;
       console.log(
-        `New refund calculation: No submissions expected in period - $0 base refund`
+        `New refund calculation: No submissions expected in period - $0 refund`
       );
     } else {
       // Calculate refund per submission: price ÷ total submissions
@@ -552,16 +551,7 @@ async function calculateRefundFromSubmissionsNew(
       refundAmount = verifiedCount * refundPerSubmission;
 
       console.log(
-        `New refund calculation: ${verifiedCount}/${totalExpected} verified submissions - $${monthlyPrice} ÷ ${totalExpected} = $${refundPerSubmission.toFixed(2)} per submission - Base refund: $${refundAmount.toFixed(2)}`
-      );
-    }
-
-    // Add $10 bonus for first billing cycle (separate from submission count)
-    if (isFirstBillingCycle) {
-      const bonusAmount = 10;
-      refundAmount += bonusAmount;
-      console.log(
-        `New refund calculation: First billing cycle - Adding $${bonusAmount} bonus. Total refund: $${refundAmount.toFixed(2)}`
+        `New refund calculation: ${verifiedCount}/${totalExpected} verified submissions - $${monthlyPrice} ÷ ${totalExpected} = $${refundPerSubmission.toFixed(2)} per submission - Refund: $${refundAmount.toFixed(2)}`
       );
     }
   } catch (error) {
@@ -571,7 +561,7 @@ async function calculateRefundFromSubmissionsNew(
       successfulSubmissions: verifiedCount,
       missedSubmissions,
       completionRate,
-      refundAmount: isFirstBillingCycle ? 10 : 0, // $10 bonus if first month, otherwise $0
+      refundAmount: 0,
       isFirstBillingCycle,
     };
   }
@@ -596,11 +586,11 @@ async function calculateRefundFromSubmissionsNew(
  *
  * Note: "denied" submissions count as expected but NOT successful
  *
- * First Billing Cycle (includes $10 bonus for all users):
- * - 90%+ completion: $108 refund ($98 + $10 bonus)
- * - 70-89% completion: $59 refund ($49 + $10 bonus)
- * - 50-69% completion: $40 refund ($30 + $10 bonus)
- * - <50%: $10 refund (bonus only)
+ * First Billing Cycle:
+ * - 90%+ completion: $98 refund
+ * - 70-89% completion: $49 refund
+ * - 50-69% completion: $30 refund
+ * - <50%: No refund
  *
  * Subsequent Billing Cycles:
  * - 90%+ completion: $50 refund
@@ -629,22 +619,20 @@ function calculateRefundFromSubmissions(
   let refundAmount = 0;
 
   if (isFirstBillingCycle) {
-    // First billing cycle refund logic (with $10 bonus for all users)
-    // The $10 bonus is separate from submission count - they get it no matter what
+    // First billing cycle refund logic
     if (totalExpected === 0) {
-      // No submissions expected, but still give $10 bonus for first month
-      refundAmount = 10;
+      refundAmount = 0; // No submissions expected, no refund
       console.log(
-        `Legacy refund calculation: No submissions expected in period - $10 bonus only (first month)`
+        `Legacy refund calculation: No submissions expected in period - $0 refund`
       );
     } else if (completionRate >= 90) {
-      refundAmount = 98 + 10; // $108 total
+      refundAmount = 98;
     } else if (completionRate >= 70) {
-      refundAmount = 49 + 10; // $59 total
+      refundAmount = 49;
     } else if (completionRate >= 50) {
-      refundAmount = 30 + 10; // $40 total
+      refundAmount = 30;
     } else {
-      refundAmount = 10; // $10 bonus even if below threshold
+      refundAmount = 0; // No refund if below threshold
     }
   } else {
     // Subsequent billing cycles refund logic
@@ -719,7 +707,7 @@ async function processRefund(
     const originalPaymentAmount = payment.amount;
 
     // Cap refund at original payment amount (Stripe limitation)
-    // If calculated refund exceeds payment, user gets full refund + we log the bonus
+    // If calculated refund exceeds payment, user gets full refund
     const wasCapped = refundAmount > originalPaymentAmount;
     if (wasCapped) {
       console.log(
@@ -740,7 +728,7 @@ async function processRefund(
       return;
     }
 
-    // Get invoice to find customer ID (needed for refund and potential bonus)
+    // Get invoice to find customer ID (needed for refund)
     let customerId: string | null = null;
     let paymentIntentId = payment.stripePaymentIntentId;
 
@@ -862,55 +850,6 @@ async function processRefund(
     console.log(
       `Refund recorded in payment history for user ${payment.userId}`
     );
-
-    // If refund was capped and it's first billing cycle, send extra $10 bonus
-    if (wasCapped && isFirstBillingCycle && customerId) {
-      const bonusAmount = 10;
-      console.log(
-        `🎁 Sending $${bonusAmount} bonus to customer ${customerId} (refund was capped)`
-      );
-
-      try {
-        // Add $10 credit to customer's balance using Customer Balance Transactions API
-        // Negative amount = credit (money going to customer), positive = charge
-        // This credit will automatically apply to their next invoice or they can request a payout
-        await stripe.customers.createBalanceTransaction(customerId, {
-          amount: -Math.round(bonusAmount * 100), // Negative for credit (convert to cents)
-          currency: "usd",
-          description: `First billing cycle bonus - refund was capped`,
-        });
-
-        console.log(
-          `✅ $${bonusAmount} bonus added to customer ${customerId} balance`
-        );
-
-        // Record the bonus in payment history for audit trail
-        await dynamoDb.send(
-          new PutCommand({
-            TableName: TableNames.PAYMENT_HISTORY,
-            Item: {
-              paymentId: `bonus-${payment.userId}-${Date.now()}`,
-              userId: payment.userId,
-              subscriptionId: payment.subscriptionId,
-              type: "refund",
-              amount: bonusAmount,
-              status: "succeeded",
-              stripeInvoiceId: payment.stripeInvoiceId,
-              stripePaymentIntentId: paymentIntentId,
-              stripeChargeId: null,
-              refundReason: `First billing cycle bonus: Extra $${bonusAmount} (refund was capped at $${originalPaymentAmount}, calculated was $${originalCalculatedRefund})`,
-              createdAt: new Date().toISOString(),
-            },
-          })
-        );
-      } catch (error) {
-        console.error(
-          `Error sending $${bonusAmount} bonus to customer ${customerId}:`,
-          error
-        );
-        // Don't throw - we don't want to fail the refund if bonus fails
-      }
-    }
   } catch (error) {
     console.error("Error processing refund:", error);
     throw error;
