@@ -439,7 +439,10 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
         new UpdateCommand({
           TableName: TableNames.USERS,
           Key: { userId: userId },
-          UpdateExpression: "SET currentChallengeId = :challengeId, timezone = :timezone",
+          UpdateExpression: "SET currentChallengeId = :challengeId, #timezone = :timezone",
+          ExpressionAttributeNames: {
+            "#timezone": "timezone",
+          },
           ExpressionAttributeValues: {
             ":challengeId": challengeId,
             ":timezone": onboarding.timezone || "America/Los_Angeles",
