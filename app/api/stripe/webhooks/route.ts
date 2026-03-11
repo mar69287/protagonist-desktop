@@ -434,19 +434,20 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
 
       console.log(`Challenge ${challengeId} created for user ${userId}`);
 
-      // Update user with challengeId
+      // Update user with challengeId and timezone
       await dynamoDb.send(
         new UpdateCommand({
           TableName: TableNames.USERS,
           Key: { userId: userId },
-          UpdateExpression: "SET currentChallengeId = :challengeId",
+          UpdateExpression: "SET currentChallengeId = :challengeId, timezone = :timezone",
           ExpressionAttributeValues: {
             ":challengeId": challengeId,
+            ":timezone": onboarding.timezone || "America/Los_Angeles",
           },
         })
       );
 
-      console.log(`User ${userId} updated with challengeId ${challengeId}`);
+      console.log(`User ${userId} updated with challengeId ${challengeId} and timezone ${onboarding.timezone || "America/Los_Angeles"}`);
 
       // EventBridge rule will be created in handleInvoicePaymentSucceeded
       // when we have the paymentId
