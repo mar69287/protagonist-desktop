@@ -96,51 +96,53 @@ export async function POST(request: NextRequest) {
       } period: ${subscriptionStart.toISOString()} to ${subscriptionEnd.toISOString()} (checking at ${checkTime.toISOString()})`
     );
 
-    // Check if current challenge started before or after the billing period started
-    const currentChallengeStart = new Date(currentChallenge.startDate);
-    const challengesToCheck = [currentChallenge];
-
-    // If current challenge started AFTER billing period start,
-    // we need to also check the previous challenge
+    // Get ALL user challenges to find which ones overlap with the subscription period
     const { QueryCommand } = await import("@aws-sdk/lib-dynamodb");
+    
+    const userChallengesResult = await dynamoDb.send(
+      new QueryCommand({
+        TableName: TableNames.CHALLENGES,
+        IndexName: "userId-createdAt-index",
+        KeyConditionExpression: "userId = :userId",
+        ExpressionAttributeValues: {
+          ":userId": userId,
+        },
+        ScanIndexForward: true, // Sort ascending by createdAt (oldest first)
+      })
+    );
 
-    if (currentChallengeStart > subscriptionStart) {
-      console.log(
-        `Current challenge started ${currentChallenge.startDate} (after period start), checking for previous challenge`
-      );
+    const allChallenges = userChallengesResult.Items || [];
+    
+    // Filter challenges that have submissions within the subscription period
+    // A challenge is relevant if:
+    // 1. It has a startDate that's before or during the period, AND
+    // 2. It has submissions that fall within the subscription period
+    const challengesToCheck = allChallenges.filter((challenge) => {
+      const challengeStart = new Date(challenge.startDate);
+      const challengeEnd = challenge.endDate ? new Date(challenge.endDate) : null;
+      
+      // Challenge is relevant if:
+      // - It started before or during the subscription period, AND
+      // - It hasn't ended yet, OR it ended during/after the subscription period started
+      const startedBeforeOrDuringPeriod = challengeStart <= subscriptionEnd;
+      const endedAfterPeriodStart = !challengeEnd || challengeEnd >= subscriptionStart;
+      
+      return startedBeforeOrDuringPeriod && endedAfterPeriodStart;
+    });
 
-      // Get all user challenges sorted by creation date
-      const userChallengesResult = await dynamoDb.send(
-        new QueryCommand({
-          TableName: TableNames.CHALLENGES,
-          IndexName: "userId-createdAt-index",
-          KeyConditionExpression: "userId = :userId",
-          ExpressionAttributeValues: {
-            ":userId": userId,
-          },
-          ScanIndexForward: true, // Sort ascending by createdAt (oldest first)
-        })
-      );
-
-      const allChallenges = userChallengesResult.Items || [];
-
-      // Find the previous challenge (the one before current)
-      const currentIndex = allChallenges.findIndex(
-        (c) => c.challengeId === user.currentChallengeId
-      );
-
-      if (currentIndex > 0) {
-        const previousChallenge = allChallenges[currentIndex - 1];
-        challengesToCheck.unshift(previousChallenge); // Add to beginning
-        console.log(
-          `Found previous challenge ${previousChallenge.challengeId}, checking both`
-        );
-      }
-    } else {
-      console.log(
-        `Current challenge started ${currentChallenge.startDate} (before or at period start), only checking this challenge`
-      );
+    // If no challenges found, at least include the current challenge
+    if (challengesToCheck.length === 0) {
+      challengesToCheck.push(currentChallenge);
     }
+
+    console.log(
+      `Found ${challengesToCheck.length} challenge(s) with submissions in subscription period:`,
+      challengesToCheck.map((c) => ({
+        challengeId: c.challengeId,
+        startDate: c.startDate,
+        endDate: c.endDate,
+      }))
+    );
 
     // Collect all submission days from submissionCalendar(s) that fall within billing period
     const allRelevantSubmissions: SubmissionDay[] = [];
