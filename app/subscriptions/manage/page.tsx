@@ -106,12 +106,12 @@ interface User {
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
   subscriptionStatus?:
-    | "active"
-    | "canceled"
-    | "past_due"
-    | "unpaid"
-    | "trialing"
-    | null;
+  | "active"
+  | "canceled"
+  | "past_due"
+  | "unpaid"
+  | "trialing"
+  | null;
   currentPeriodStart?: string | null;
   currentPeriodEnd?: string | null;
   cancelAtPeriodEnd?: boolean;
@@ -146,6 +146,8 @@ export default function ManageSubscriptionPage() {
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancellingImmediate, setCancellingImmediate] = useState(false);
+  const [showImmediateCancelConfirm, setShowImmediateCancelConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasNoSubscription, setHasNoSubscription] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -201,6 +203,8 @@ export default function ManageSubscriptionPage() {
       }
 
       const subscriptionData = await subscriptionResponse.json();
+      console.log("Subscription data:", subscriptionData);
+      console.log("Status:", subscriptionData.status, "Cancel at period end:", subscriptionData.cancelAtPeriodEnd);
       setSubscription(subscriptionData);
     } catch (err: any) {
       console.error("Error fetching subscription:", err);
@@ -237,6 +241,46 @@ export default function ManageSubscriptionPage() {
       setError(err.message || "Failed to cancel subscription");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleCancelImmediate = async () => {
+    try {
+      setCancellingImmediate(true);
+      setError(null);
+
+      const response = await fetch("/api/stripe/cancel-subscription-immediate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          subscriptionId: dbUser?.stripeSubscriptionId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to cancel subscription immediately");
+      }
+
+      const data = await response.json();
+
+      // Refresh subscription data
+      await fetchUserAndSubscription();
+      setShowImmediateCancelConfirm(false);
+
+      // Show success message with refund info if applicable
+      if (data.refundCalculation && data.refundCalculation.refundAmount > 0) {
+        setError(null);
+        // You could show a success toast here if you have one
+        console.log(`Refund processed: $${data.refundCalculation.refundAmount}`);
+      }
+    } catch (err: any) {
+      console.error("Error cancelling subscription immediately:", err);
+      setError(err.message || "Failed to cancel subscription immediately");
+    } finally {
+      setCancellingImmediate(false);
     }
   };
 
@@ -457,16 +501,16 @@ export default function ManageSubscriptionPage() {
                         subscription.status === "trialing"
                           ? "rgba(136, 136, 136, 0.15)"
                           : subscription.cancelAtPeriodEnd
-                          ? "rgba(239, 68, 68, 0.15)"
-                          : "rgba(34, 197, 94, 0.15)",
+                            ? "rgba(239, 68, 68, 0.15)"
+                            : "rgba(34, 197, 94, 0.15)",
                       borderRadius: "50%",
                       padding: "12px",
                       border:
                         subscription.status === "trialing"
                           ? "1px solid rgba(136, 136, 136, 0.3)"
                           : subscription.cancelAtPeriodEnd
-                          ? "1px solid rgba(239, 68, 68, 0.3)"
-                          : "1px solid rgba(34, 197, 94, 0.3)",
+                            ? "1px solid rgba(239, 68, 68, 0.3)"
+                            : "1px solid rgba(34, 197, 94, 0.3)",
                     }}
                   >
                     <CreditCard
@@ -476,8 +520,8 @@ export default function ManageSubscriptionPage() {
                           subscription.status === "trialing"
                             ? "#888888"
                             : subscription.cancelAtPeriodEnd
-                            ? "#ef4444"
-                            : "#22c55e",
+                              ? "#ef4444"
+                              : "#22c55e",
                       }}
                     />
                   </div>
@@ -494,8 +538,8 @@ export default function ManageSubscriptionPage() {
                       {subscription.status === "trialing"
                         ? "Trial Period"
                         : subscription.cancelAtPeriodEnd
-                        ? "Subscription Ending"
-                        : "Active Subscription"}
+                          ? "Subscription Ending"
+                          : "Active Subscription"}
                     </h2>
                     <p
                       style={{
@@ -511,46 +555,46 @@ export default function ManageSubscriptionPage() {
                     </p>
                   </div>
                 </div>
-                  <div
-                    style={{
-                      backgroundColor:
-                        subscription.status === "trialing"
-                          ? "rgba(136, 136, 136, 0.1)"
-                          : subscription.cancelAtPeriodEnd
+                <div
+                  style={{
+                    backgroundColor:
+                      subscription.status === "trialing"
+                        ? "rgba(136, 136, 136, 0.1)"
+                        : subscription.cancelAtPeriodEnd
                           ? "rgba(239, 68, 68, 0.1)"
                           : "rgba(34, 197, 94, 0.1)",
-                      padding: "8px 16px",
-                      borderRadius: "20px",
-                      border:
-                        subscription.status === "trialing"
-                          ? "1px solid rgba(136, 136, 136, 0.3)"
-                          : subscription.cancelAtPeriodEnd
+                    padding: "8px 16px",
+                    borderRadius: "20px",
+                    border:
+                      subscription.status === "trialing"
+                        ? "1px solid rgba(136, 136, 136, 0.3)"
+                        : subscription.cancelAtPeriodEnd
                           ? "1px solid rgba(239, 68, 68, 0.3)"
                           : "1px solid rgba(34, 197, 94, 0.3)",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        color:
-                          subscription.status === "trialing"
-                            ? "#888888"
-                            : subscription.cancelAtPeriodEnd
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color:
+                        subscription.status === "trialing"
+                          ? "#888888"
+                          : subscription.cancelAtPeriodEnd
                             ? "#ef4444"
                             : "#22c55e",
-                        fontFamily: "'OggText', 'Ogg', serif",
-                        letterSpacing: "1px",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      {subscription.status === "trialing"
-                        ? "Trial"
-                        : subscription.cancelAtPeriodEnd
+                      fontFamily: "'OggText', 'Ogg', serif",
+                      letterSpacing: "1px",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {subscription.status === "trialing"
+                      ? "Trial"
+                      : subscription.cancelAtPeriodEnd
                         ? "Ending Soon"
                         : "Active"}
-                    </span>
-                  </div>
+                  </span>
+                </div>
               </div>
 
               {/* Billing Period / Trial Info */}
@@ -562,10 +606,9 @@ export default function ManageSubscriptionPage() {
                 }}
               >
                 <div className="space-y-4">
-                  {/* Trial End Date (if in active trial, not cancelled) */}
+                  {/* Trial End Date (if in trial) */}
                   {subscription.status === "trialing" &&
-                    subscription.trialEnd &&
-                    !subscription.cancelAtPeriodEnd && (
+                    subscription.trialEnd && (
                       <div className="flex items-center gap-3">
                         <Calendar
                           className="w-5 h-5"
@@ -613,7 +656,7 @@ export default function ManageSubscriptionPage() {
                             trialEndDate.setHours(0, 0, 0, 0);
                             const daysRemaining = Math.ceil(
                               (trialEndDate.getTime() - today.getTime()) /
-                                (1000 * 60 * 60 * 24)
+                              (1000 * 60 * 60 * 24)
                             );
                             return (
                               <p
@@ -625,9 +668,8 @@ export default function ManageSubscriptionPage() {
                                 }}
                               >
                                 {daysRemaining > 0
-                                  ? `${daysRemaining} ${
-                                      daysRemaining === 1 ? "day" : "days"
-                                    } remaining in trial`
+                                  ? `${daysRemaining} ${daysRemaining === 1 ? "day" : "days"
+                                  } remaining in trial`
                                   : "Trial ending today"}
                               </p>
                             );
@@ -694,11 +736,11 @@ export default function ManageSubscriptionPage() {
                           marginBottom: "4px",
                         }}
                       >
-                        {subscription.status === "trialing" && !subscription.cancelAtPeriodEnd
+                        {subscription.status === "trialing"
                           ? "First Billing Date"
                           : subscription.cancelAtPeriodEnd
-                          ? "Expires On"
-                          : "Next Billing Date"}
+                            ? "Expires On"
+                            : "Next Billing Date"}
                       </p>
                       <p
                         style={{
@@ -726,7 +768,7 @@ export default function ManageSubscriptionPage() {
                         endDate.setHours(0, 0, 0, 0);
                         const daysRemaining = Math.ceil(
                           (endDate.getTime() - today.getTime()) /
-                            (1000 * 60 * 60 * 24)
+                          (1000 * 60 * 60 * 24)
                         );
                         return (
                           <p
@@ -738,9 +780,8 @@ export default function ManageSubscriptionPage() {
                             }}
                           >
                             {daysRemaining > 0
-                              ? `${daysRemaining} ${
-                                  daysRemaining === 1 ? "day" : "days"
-                                } remaining`
+                              ? `${daysRemaining} ${daysRemaining === 1 ? "day" : "days"
+                              } remaining`
                               : "Expired"}
                           </p>
                         );
@@ -803,7 +844,8 @@ export default function ManageSubscriptionPage() {
                 return null;
               })()}
 
-              {subscription.cancelAtPeriodEnd && (
+              {subscription.cancelAtPeriodEnd &&
+                subscription.status !== "trialing" && (
                   <div
                     style={{
                       marginTop: "16px",
@@ -821,43 +863,87 @@ export default function ManageSubscriptionPage() {
                           "'Helvetica Neue', -apple-system, system-ui, sans-serif",
                       }}
                     >
-                      {subscription.status === "trialing" ? (
-                        <>
-                          Your trial has been cancelled. You'll continue to have access
-                          until{" "}
-                          {subscription.trialEnd &&
-                            new Date(subscription.trialEnd).toLocaleDateString(
-                              "en-US",
-                              {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                              }
-                            )}
-                          , and you won't be charged the $98/month after that.
-                          <br />
-                          <br />
-                          <strong style={{ color: "#22c55e" }}>
-                            💰 You can still get your $10 back!
-                          </strong>{" "}
-                          Complete all submission proofs during your trial period
-                          and we'll refund your $10.
-                        </>
-                      ) : (
-                        <>
-                          Your subscription will be cancelled at the end of the
-                          current billing period. You'll continue to have access
-                          until then.
-                        </>
-                      )}
+                      Your subscription will be cancelled at the end of the
+                      current billing period. You'll continue to have access
+                      until then.
                     </p>
                   </div>
                 )}
             </NeumorphicCard>
 
             {/* Cancel Subscription Section */}
-            {/* Show cancel button only for non-cancelled subscriptions */}
-            {!subscription.cancelAtPeriodEnd && (
+            {/* Show cancel button for trials OR for active non-cancelled subscriptions */}
+            {(subscription.status === "trialing" ||
+              !subscription.cancelAtPeriodEnd) && (
+                <NeumorphicCard>
+                  <h3
+                    style={{
+                      fontSize: "18px",
+                      fontWeight: 800,
+                      color: "#e0e0e0",
+                      marginBottom: "12px",
+                      fontFamily: "'OggText', 'Ogg', serif",
+                    }}
+                  >
+                    {subscription.status === "trialing"
+                      ? "Cancel Trial"
+                      : "Cancel Subscription"}
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: "14px",
+                      color: "#888888",
+                      marginBottom: "24px",
+                      fontFamily:
+                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    {subscription.status === "trialing" ? (
+                      <>
+                        Cancel now to avoid the $98 monthly charge. You'll keep
+                        access until your trial ends, but won't be charged after
+                        that.
+                        <br />
+                        <br />
+                        <strong style={{ color: "#22c55e" }}>
+                          Good news: You can still earn your $10 trial fee back!
+                        </strong>{" "}
+                        Complete all your submission proofs during the trial period
+                        and we'll refund your $10.
+                      </>
+                    ) : (
+                      "If you cancel, you'll continue to have access until the end of your current billing period. You can resubscribe at any time."
+                    )}
+                  </p>
+                  <button
+                    onClick={() => setShowCancelConfirm(true)}
+                    style={{
+                      width: "100%",
+                      padding: "16px",
+                      borderRadius: "16px",
+                      fontWeight: 700,
+                      fontSize: "16px",
+                      transition: "all 0.3s ease",
+                      fontFamily:
+                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                      color: "#ef4444",
+                      border: "1px solid rgba(239, 68, 68, 0.3)",
+                      cursor: "pointer",
+                    }}
+                    className="hover:bg-[rgba(239,68,68,0.15)]"
+                  >
+                    {subscription.status === "trialing"
+                      ? "Cancel Trial"
+                      : "Cancel Subscription"}
+                  </button>
+                </NeumorphicCard>
+              )}
+
+            {/* Cash Out and Cancel Immediately Section */}
+            {/* Show for active or trialing subscriptions (even if already scheduled for cancellation) */}
+            {(subscription.status === "active" || subscription.status === "trialing") && (
               <NeumorphicCard>
                 <h3
                   style={{
@@ -868,9 +954,7 @@ export default function ManageSubscriptionPage() {
                     fontFamily: "'OggText', 'Ogg', serif",
                   }}
                 >
-                  {subscription.status === "trialing"
-                    ? "Cancel Trial"
-                    : "Cancel Subscription"}
+                  Cash Out and Cancel Immediately
                 </h3>
                 <p
                   style={{
@@ -884,23 +968,20 @@ export default function ManageSubscriptionPage() {
                 >
                   {subscription.status === "trialing" ? (
                     <>
-                      Cancel now to avoid the $98 monthly charge. You'll keep
-                      access until your trial ends, but won't be charged after
-                      that.
-                      <br />
-                      <br />
-                      <strong style={{ color: "#22c55e" }}>
-                        Good news: You can still earn your $10 trial fee back!
-                      </strong>{" "}
-                      Complete all your submission proofs during the trial period
-                      and we'll refund your $10.
+                      Cancel your trial immediately and receive a refund for your successful submissions. The rest of your trial payment will be forfeited.
+                    </>
+                  ) : subscription.cancelAtPeriodEnd ? (
+                    <>
+                      Your subscription is already scheduled to cancel at the end of the period. You can cancel immediately instead and receive a refund for your successful submissions in the current period. The rest of your payment will be forfeited.
                     </>
                   ) : (
-                    "If you cancel, you'll continue to have access until the end of your current billing period. You can resubscribe at any time."
+                    <>
+                      Cancel your subscription immediately and receive a refund for your successful submissions in the current period. The rest of your payment will be forfeited.
+                    </>
                   )}
                 </p>
                 <button
-                  onClick={() => setShowCancelConfirm(true)}
+                  onClick={() => setShowImmediateCancelConfirm(true)}
                   style={{
                     width: "100%",
                     padding: "16px",
@@ -910,16 +991,14 @@ export default function ManageSubscriptionPage() {
                     transition: "all 0.3s ease",
                     fontFamily:
                       "'Helvetica Neue', -apple-system, system-ui, sans-serif",
-                    backgroundColor: "rgba(239, 68, 68, 0.1)",
+                    backgroundColor: "rgba(239, 68, 68, 0.15)",
                     color: "#ef4444",
-                    border: "1px solid rgba(239, 68, 68, 0.3)",
+                    border: "2px solid rgba(239, 68, 68, 0.4)",
                     cursor: "pointer",
                   }}
-                  className="hover:bg-[rgba(239,68,68,0.15)]"
+                  className="hover:bg-[rgba(239,68,68,0.2)]"
                 >
-                  {subscription.status === "trialing"
-                    ? "Cancel Trial"
-                    : "Cancel Subscription"}
+                  Cash Out and Cancel Immediately
                 </button>
               </NeumorphicCard>
             )}
@@ -1074,6 +1153,131 @@ export default function ManageSubscriptionPage() {
                         </>
                       ) : (
                         "Yes, Cancel"
+                      )}
+                    </button>
+                  </div>
+                </NeumorphicCard>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Immediate Cancel Confirmation Modal */}
+        <AnimatePresence>
+          {showImmediateCancelConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+              onClick={() => !cancellingImmediate && setShowImmediateCancelConfirm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="max-w-md w-full"
+              >
+                <NeumorphicCard>
+                  <div className="flex items-center gap-3 mb-4">
+                    <AlertCircle className="w-6 h-6 text-red-500" />
+                    <h3
+                      style={{
+                        fontSize: "20px",
+                        fontWeight: 800,
+                        color: "#e0e0e0",
+                        fontFamily: "'OggText', 'Ogg', serif",
+                      }}
+                    >
+                      Cash Out and Cancel Immediately?
+                    </h3>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "14px",
+                      color: "#b0b0b0",
+                      marginBottom: "24px",
+                      fontFamily:
+                        "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    <strong style={{ color: "#e0e0e0" }}>
+                      Are you sure you want to cancel immediately?
+                    </strong>
+                    <br />
+                    <br />
+                    You will receive a refund for your successful submissions in the current period. The rest of your payment will be forfeited.
+                    <br />
+                    <br />
+                    <div
+                      style={{
+                        padding: "12px",
+                        borderRadius: "8px",
+                        backgroundColor: "rgba(239, 68, 68, 0.1)",
+                        border: "1px solid rgba(239, 68, 68, 0.2)",
+                      }}
+                    >
+                      <strong style={{ fontSize: "13px", color: "#ef4444" }}>
+                        ⚠️ Important:
+                      </strong>
+                      <br />
+                      <span style={{ fontSize: "13px", color: "#b0b0b0" }}>
+                        Your subscription will be cancelled immediately and you'll lose access right away. Only successful submissions in the current period will be refunded.
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowImmediateCancelConfirm(false)}
+                      disabled={cancellingImmediate}
+                      style={{
+                        flex: 1,
+                        padding: "12px",
+                        borderRadius: "12px",
+                        fontWeight: 600,
+                        fontSize: "14px",
+                        fontFamily:
+                          "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                        backgroundColor: "rgba(255,255,255,0.05)",
+                        color: "#b0b0b0",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        cursor: cancellingImmediate ? "not-allowed" : "pointer",
+                      }}
+                      className="hover:bg-[rgba(255,255,255,0.08)]"
+                    >
+                      Keep Subscription
+                    </button>
+                    <button
+                      onClick={handleCancelImmediate}
+                      disabled={cancellingImmediate}
+                      style={{
+                        flex: 1,
+                        padding: "12px",
+                        borderRadius: "12px",
+                        fontWeight: 600,
+                        fontSize: "14px",
+                        fontFamily:
+                          "'Helvetica Neue', -apple-system, system-ui, sans-serif",
+                        backgroundColor: "#ef4444",
+                        color: "#ffffff",
+                        border: "1px solid #ef4444",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                        cursor: cancellingImmediate ? "not-allowed" : "pointer",
+                      }}
+                      className="hover:bg-[#dc2626]"
+                    >
+                      {cancellingImmediate ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        "Yes, Cash Out & Cancel"
                       )}
                     </button>
                   </div>

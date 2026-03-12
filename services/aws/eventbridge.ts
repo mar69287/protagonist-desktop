@@ -7,6 +7,7 @@ import {
   DeleteRuleCommand,
   RemoveTargetsCommand,
   ListTargetsByRuleCommand,
+  ListRulesCommand,
 } from "@aws-sdk/client-eventbridge";
 
 const eventBridgeClient = new EventBridgeClient({
@@ -180,6 +181,7 @@ export async function createTrialRefundCheckRule(
 
 /**
  * Deletes a trial refund EventBridge rule and its targets
+ * Handles rules with year-month suffixes (e.g., trial-refund-{userId}-{subId}-202604)
  */
 export async function deleteTrialRefundCheckRule(
   userId: string,
@@ -187,63 +189,160 @@ export async function deleteTrialRefundCheckRule(
 ): Promise<void> {
   const userIdShort = userId.substring(0, 8);
   const subIdShort = subscriptionId.slice(-8);
-  // Try to match the rule name pattern (without year-month since we don't know it)
-  // This is a simplified version - in production you might want to list all rules
   const ruleNamePrefix = `trial-refund-${userIdShort}-${subIdShort}`;
 
   try {
-    // For now, we'll just log this - proper implementation would list rules by prefix
-    console.log(`Would delete trial refund rule with prefix: ${ruleNamePrefix}`);
-    // In production, you'd want to list rules and delete matching ones
+    // List all rules and filter by prefix to find rules with year-month suffixes
+    const rulesResponse = await eventBridgeClient.send(
+      new ListRulesCommand({
+        NamePrefix: ruleNamePrefix,
+      })
+    );
+
+    const matchingRules = rulesResponse.Rules || [];
+
+    if (matchingRules.length === 0) {
+      console.log(`No trial refund EventBridge rules found with prefix ${ruleNamePrefix}`);
+      return;
+    }
+
+    console.log(
+      `Found ${matchingRules.length} trial refund EventBridge rule(s) to delete:`,
+      matchingRules.map((r) => r.Name)
+    );
+
+    // Delete each matching rule
+    for (const rule of matchingRules) {
+      const ruleName = rule.Name!;
+
+      try {
+        // First, remove all targets
+        const targets = await eventBridgeClient.send(
+          new ListTargetsByRuleCommand({
+            Rule: ruleName,
+          })
+        );
+
+        if (targets.Targets && targets.Targets.length > 0) {
+          const targetIds = targets.Targets.map((t) => t.Id!);
+          await eventBridgeClient.send(
+            new RemoveTargetsCommand({
+              Rule: ruleName,
+              Ids: targetIds,
+            })
+          );
+          console.log(`Removed ${targetIds.length} target(s) from rule ${ruleName}`);
+        }
+
+        // Then delete the rule
+        await eventBridgeClient.send(
+          new DeleteRuleCommand({
+            Name: ruleName,
+          })
+        );
+
+        console.log(`Trial refund EventBridge rule ${ruleName} deleted successfully`);
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.name === "ResourceNotFoundException"
+        ) {
+          console.log(`Trial refund EventBridge rule ${ruleName} not found, skipping deletion`);
+          continue;
+        }
+        console.error(`Error deleting trial refund EventBridge rule ${ruleName}:`, error);
+        // Continue with other rules even if one fails
+      }
+    }
   } catch (error) {
-    console.error(`Error deleting trial refund rule:`, error);
+    console.error(
+      `Error listing/deleting trial refund EventBridge rules with prefix ${ruleNamePrefix}:`,
+      error
+    );
+    // Don't throw - graceful degradation
   }
 }
 
 /**
  * Deletes an EventBridge rule and its targets
+ * Handles rules with year-month suffixes (e.g., pre-billing-{userId}-{subId}-202604)
  */
 export async function deletePreBillingCheckRule(
   userId: string,
   subscriptionId: string
 ): Promise<void> {
-  // Use same naming pattern as creation
   const userIdShort = userId.substring(0, 8);
   const subIdShort = subscriptionId.slice(-8);
-  const ruleName = `pre-billing-${userIdShort}-${subIdShort}`;
+  const ruleNamePrefix = `pre-billing-${userIdShort}-${subIdShort}`;
 
   try {
-    // First, remove all targets
-    const targets = await eventBridgeClient.send(
-      new ListTargetsByRuleCommand({
-        Rule: ruleName,
+    // List all rules and filter by prefix to find rules with year-month suffixes
+    const rulesResponse = await eventBridgeClient.send(
+      new ListRulesCommand({
+        NamePrefix: ruleNamePrefix,
       })
     );
 
-    if (targets.Targets && targets.Targets.length > 0) {
-      const targetIds = targets.Targets.map((t) => t.Id!);
-      await eventBridgeClient.send(
-        new RemoveTargetsCommand({
-          Rule: ruleName,
-          Ids: targetIds,
-        })
-      );
-    }
+    const matchingRules = rulesResponse.Rules || [];
 
-    // Then delete the rule
-    await eventBridgeClient.send(
-      new DeleteRuleCommand({
-        Name: ruleName,
-      })
-    );
-
-    console.log(`EventBridge rule ${ruleName} deleted successfully`);
-  } catch (error) {
-    if (error instanceof Error && error.name === "ResourceNotFoundException") {
-      console.log(`EventBridge rule ${ruleName} not found, skipping deletion`);
+    if (matchingRules.length === 0) {
+      console.log(`No EventBridge rules found with prefix ${ruleNamePrefix}`);
       return;
     }
-    console.error(`Error deleting EventBridge rule ${ruleName}:`, error);
-    throw error;
+
+    console.log(
+      `Found ${matchingRules.length} EventBridge rule(s) to delete:`,
+      matchingRules.map((r) => r.Name)
+    );
+
+    // Delete each matching rule
+    for (const rule of matchingRules) {
+      const ruleName = rule.Name!;
+
+      try {
+        // First, remove all targets
+        const targets = await eventBridgeClient.send(
+          new ListTargetsByRuleCommand({
+            Rule: ruleName,
+          })
+        );
+
+        if (targets.Targets && targets.Targets.length > 0) {
+          const targetIds = targets.Targets.map((t) => t.Id!);
+          await eventBridgeClient.send(
+            new RemoveTargetsCommand({
+              Rule: ruleName,
+              Ids: targetIds,
+            })
+          );
+          console.log(`Removed ${targetIds.length} target(s) from rule ${ruleName}`);
+        }
+
+        // Then delete the rule
+        await eventBridgeClient.send(
+          new DeleteRuleCommand({
+            Name: ruleName,
+          })
+        );
+
+        console.log(`EventBridge rule ${ruleName} deleted successfully`);
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.name === "ResourceNotFoundException"
+        ) {
+          console.log(`EventBridge rule ${ruleName} not found, skipping deletion`);
+          continue;
+        }
+        console.error(`Error deleting EventBridge rule ${ruleName}:`, error);
+        // Continue with other rules even if one fails
+      }
+    }
+  } catch (error) {
+    console.error(
+      `Error listing/deleting EventBridge rules with prefix ${ruleNamePrefix}:`,
+      error
+    );
+    // Don't throw - graceful degradation
   }
 }
