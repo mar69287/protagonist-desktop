@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { dynamoDb, TableNames } from "@/services/aws/dynamodb";
-import { UpdateCommand, PutCommand, QueryCommand, GetCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { UpdateCommand, PutCommand, QueryCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
 import {
   generateSubmissionCalendar,
@@ -281,39 +281,6 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       !existingChallenges.Items || existingChallenges.Items.length === 0;
 
     if (isFirstSubscription) {
-      // If this is the first subscription AND it's NOT a trial, set it to cancel at period end
-      // For trial subscriptions, we'll set cancel_at_period_end when the first full monthly payment is made
-      if (!trialEnd) {
-        console.log(
-          `First subscription for user ${userId} (no trial) - setting cancel_at_period_end to true`
-        );
-
-        // Update Stripe subscription to cancel at period end
-        await stripe.subscriptions.update(fullSubscription.id, {
-          cancel_at_period_end: true,
-        });
-
-        console.log(
-          `Subscription ${fullSubscription.id} set to cancel at period end`
-        );
-
-        // Update DynamoDB to reflect this
-        await dynamoDb.send(
-          new UpdateCommand({
-            TableName: TableNames.USERS,
-            Key: { userId: userId },
-            UpdateExpression: "SET cancelAtPeriodEnd = :cancel",
-            ExpressionAttributeValues: {
-              ":cancel": true,
-            },
-          })
-        );
-      } else {
-        console.log(
-          `First subscription for user ${userId} has trial - will set cancel_at_period_end after first full monthly payment`
-        );
-      }
-
       // Fetch onboarding data
       const onboardingData = await dynamoDb.send(
         new GetCommand({
@@ -911,76 +878,8 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       `✅ Payment recorded for user ${userId} with PaymentIntent ${paymentIntentId}`
     );
 
-    // Get subscription to check for trial
-    const fullSubscription = await stripe.subscriptions.retrieve(subscriptionId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const trialEnd = (fullSubscription as any).trial_end;
-
-    // Check if this is the first full monthly payment (amount > $10) after a trial
-    // If so, set cancel_at_period_end = true
-    const paymentAmount = (invoice.amount_paid ?? 0) / 100;
-    if (paymentAmount > 10 && fullSubscription.status === "active") {
-      console.log(
-        `💰 Payment amount is $${paymentAmount} - checking if this is first full monthly payment`
-      );
-
-      // Scan payment history to see if there are any other payments > $10 for this subscription
-      const paymentHistoryScan = await dynamoDb.send(
-        new ScanCommand({
-          TableName: TableNames.PAYMENT_HISTORY,
-          FilterExpression: "subscriptionId = :subscriptionId AND amount > :amount AND #type = :type",
-          ExpressionAttributeNames: {
-            "#type": "type",
-          },
-          ExpressionAttributeValues: {
-            ":subscriptionId": subscriptionId,
-            ":amount": 10,
-            ":type": "payment",
-          },
-        })
-      );
-
-      const previousFullPayments = paymentHistoryScan.Items || [];
-      console.log(
-        `Found ${previousFullPayments.length} payment(s) > $10 for subscription ${subscriptionId} (including current one)`
-      );
-
-      // If this is the first full payment (only 1 payment > $10 exists, which is the current one)
-      if (previousFullPayments.length === 1) {
-        console.log(
-          `🎯 First full monthly payment detected - setting cancel_at_period_end to true`
-        );
-
-        try {
-          // Update Stripe subscription to cancel at period end
-          await stripe.subscriptions.update(fullSubscription.id, {
-            cancel_at_period_end: true,
-          });
-
-          // Update DynamoDB to reflect this
-          await dynamoDb.send(
-            new UpdateCommand({
-              TableName: TableNames.USERS,
-              Key: { userId: userId },
-              UpdateExpression: "SET cancelAtPeriodEnd = :cancel",
-              ExpressionAttributeValues: {
-                ":cancel": true,
-              },
-            })
-          );
-
-          console.log(
-            `✅ Subscription ${fullSubscription.id} set to cancel at period end after first full payment`
-          );
-        } catch (error) {
-          console.error(
-            `Failed to set cancel_at_period_end for subscription ${fullSubscription.id}:`,
-            error
-          );
-          // Don't fail the webhook if this update fails
-        }
-      }
-    }
+    const trialEnd = (subscription as any).trial_end;
 
     // If this is a trial subscription, create a trial refund check FIRST
     if (trialEnd && billingReason === "subscription_create") {
