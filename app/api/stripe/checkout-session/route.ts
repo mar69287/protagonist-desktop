@@ -43,34 +43,25 @@ export async function POST(request: NextRequest) {
     // Build line items based on subscription status and trial selection
     const lineItems: Array<{ price: string; quantity: number }> = [];
 
-    if (isFirstSubscription) {
-      // First subscription: only use the first price
-      console.log(`🎯 [Checkout Session API] First subscription detected - using only first price: ${firstMonthPriceId}`);
-      if (!firstMonthPriceId) {
-        throw new Error("STRIPE_PRICE_ID is not configured");
-      }
-      lineItems.push({
-        price: firstMonthPriceId,
-        quantity: 1,
-      });
-    } else {
-      // Second+ subscription: use the selected price ID
-      if (!selectedPriceId) {
-        throw new Error("selectedPriceId is required for second+ subscriptions");
-      }
-      console.log(`🎯 [Checkout Session API] Second+ subscription detected - using selected price: ${selectedPriceId}`);
-      
-      // Validate that the selected price is one of the allowed options
-      const allowedPriceIds = [firstMonthPriceId, secondMonthPriceId1, secondMonthPriceId2, secondMonthPriceId3].filter(Boolean);
-      if (!allowedPriceIds.includes(selectedPriceId)) {
-        throw new Error(`Invalid price ID: ${selectedPriceId}. Must be one of: ${allowedPriceIds.join(", ")}`);
-      }
-      
-      lineItems.push({
-        price: selectedPriceId,
-        quantity: 1,
-      });
+    // Use selectedPriceId if provided, otherwise fall back to the default first month price
+    const resolvedPriceId = selectedPriceId || firstMonthPriceId;
+
+    if (!resolvedPriceId) {
+      throw new Error("No price ID available. Ensure STRIPE_PRICE_ID is configured or a selectedPriceId is provided.");
     }
+
+    // Validate that the selected price is one of the allowed options
+    const allowedPriceIds = [firstMonthPriceId, secondMonthPriceId1, secondMonthPriceId2, secondMonthPriceId3].filter(Boolean);
+    if (!allowedPriceIds.includes(resolvedPriceId)) {
+      throw new Error(`Invalid price ID: ${resolvedPriceId}. Must be one of: ${allowedPriceIds.join(", ")}`);
+    }
+
+    console.log(`🎯 [Checkout Session API] Using price: ${resolvedPriceId} (isFirstSubscription=${isFirstSubscription}, selectedPriceId=${selectedPriceId})`);
+
+    lineItems.push({
+      price: resolvedPriceId,
+      quantity: 1,
+    });
 
     // Add trial fee if user selected trial option
     if (useTrial) {

@@ -526,9 +526,9 @@ function SignupContent() {
     }
   }, [isFirstSubscription, loadingUser]);
 
-  // Fetch price data from Stripe when it's not the first subscription
+  // Fetch price data from Stripe for all subscriptions (needed for Hero/Legend mode selection)
   useEffect(() => {
-    if (!isFirstSubscription && !loadingUser) {
+    if (!loadingUser) {
       setLoadingPrices(true);
       const priceIds = getSecondMonthPriceIds();
       if (priceIds.length === 0) {
@@ -563,7 +563,7 @@ function SignupContent() {
           setLoadingPrices(false);
         });
     }
-  }, [isFirstSubscription, loadingUser]);
+  }, [loadingUser]);
 
   // Fetch onboarding sentences when it's the first subscription
   useEffect(() => {
@@ -607,8 +607,16 @@ function SignupContent() {
   }, [isFirstSubscription, userId, loadingUser]);
 
   const handleStartCommitment = () => {
-    // For second+ subscriptions, map selectedMode to priceId
-    if (!isFirstSubscription) {
+    // Map selectedMode to priceId for all subscriptions
+    if (isFirstSubscription) {
+      if (selectedMode === 1) {
+        setSelectedPriceId(firstMonthPrice?.id || null);
+      } else if (selectedMode === 2 && priceData.length > 1) {
+        setSelectedPriceId(priceData[1].id);
+      } else if (selectedMode === 3 && priceData.length > 2) {
+        setSelectedPriceId(priceData[2].id);
+      }
+    } else {
       if (selectedMode === 1 && priceData.length > 0) {
         setSelectedPriceId(priceData[0].id);
       } else if (selectedMode === 2 && priceData.length > 1) {
@@ -1693,13 +1701,11 @@ function SignupContent() {
                           }}
                           className="group-hover:text-[#b0b0b0] transition-colors"
                         >
-                          {isFirstSubscription
+                          {selectedMode === 1
                             ? `I understand that I pay $30/month and earn $1+ back for each successful submission. Miss a day, that money is gone. I can cancel anytime.`
-                            : selectedMode === 1
-                              ? `I understand that I pay $30/month and earn $1+ back for each successful submission. Miss a day, that money is gone. I can cancel anytime.`
-                              : selectedMode === 2
-                                ? `I understand that I pay $60/month and earn $2+ back for each successful submission. Miss a day, that money is gone. I can cancel anytime.`
-                                : `I understand that I pay $90/month and earn $3+ back for each successful submission. Miss a day, that money is gone. I can cancel anytime.`}
+                            : selectedMode === 2
+                              ? `I understand that I pay $60/month and earn $2+ back for each successful submission. Miss a day, that money is gone. I can cancel anytime.`
+                              : `I understand that I pay $90/month and earn $3+ back for each successful submission. Miss a day, that money is gone. I can cancel anytime.`}
                         </span>
                       </div>
                     </div>
