@@ -176,9 +176,7 @@ function NeumorphicCard({
   );
 }
 
-// Feature flag: Set to true to enable HERO and LEGEND modes for second+ subscriptions
-// Set to false to lock them (currently locked while app features are being developed)
-const ENABLE_HIGHER_TIERS = false;
+// LEGEND mode is permanently locked until its features are built out
 
 // Price IDs for second+ subscriptions - fetched from environment variables
 const getSecondMonthPriceIds = () => {
@@ -866,7 +864,7 @@ function SignupContent() {
                     ].map((tier) => {
                       const isSelected = selectedMode === tier.mode;
                       // Lock higher tiers (2, 3) if: first subscription OR higher tiers feature is disabled
-                      const isLocked = tier.mode > 1 && (isFirstSubscription || !ENABLE_HIGHER_TIERS);
+                      const isLocked: boolean = tier.mode === 3;
 
                       return (
                         <div
