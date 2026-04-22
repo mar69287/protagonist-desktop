@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Loader2, Mail, Lock, AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -89,7 +88,6 @@ function NeumorphicCard({
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const { login, isAuthenticated, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -101,11 +99,12 @@ export default function LoginPage() {
   const redirectTo = searchParams.get('redirect') || '/subscriptions/manage';
 
   useEffect(() => {
-    // If already authenticated, redirect to intended page
+    // If already authenticated, do a hard redirect so the server-side
+    // middleware can read the fresh Amplify auth cookies.
     if (isAuthenticated && !authLoading) {
-      router.push(redirectTo);
+      window.location.href = redirectTo;
     }
-  }, [isAuthenticated, authLoading, router, redirectTo]);
+  }, [isAuthenticated, authLoading, redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

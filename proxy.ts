@@ -7,18 +7,23 @@ export default async function proxy(request: NextRequest): Promise<NextResponse>
 
   const { pathname } = request.nextUrl;
 
-  // Only check authentication for the subscription management page
-  const isManageSubscriptionRoute = pathname.startsWith("/subscriptions/manage");
+  // Routes that require an authenticated user. Non-authed visits are
+  // redirected to /login with a ?redirect=... param so the login flow can
+  // send them back here once signed in.
+  const isProtectedRoute =
+    pathname.startsWith("/subscriptions/manage") ||
+    pathname.startsWith("/admin");
 
-  if (isManageSubscriptionRoute) {
+  if (isProtectedRoute) {
     // Check for an authenticated user
     const user = await authenticatedUser({ request, response });
 
     // If not authenticated, redirect to login
     if (!user) {
       const url = new URL("/login", request.url);
-      // Store the intended destination
-      url.searchParams.set("redirect", pathname);
+      // Store the intended destination (including any query string)
+      const fullPath = `${pathname}${request.nextUrl.search || ""}`;
+      url.searchParams.set("redirect", fullPath);
       return NextResponse.redirect(url);
     }
   }
