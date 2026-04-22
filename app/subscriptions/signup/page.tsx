@@ -872,7 +872,7 @@ function SignupContent() {
                     ].map((tier) => {
                       const isSelected = selectedMode === tier.mode;
                       // Lock higher tiers (2, 3) if: first subscription OR higher tiers feature is disabled
-                      const isLocked: boolean = tier.mode === 3;
+                      const isLocked: boolean = false;
 
                       return (
                         <div
@@ -941,20 +941,7 @@ function SignupContent() {
                                       </div>
                                     </>
                                   ) : tier.mode === 3 ? (
-                                    <>
-                                      <div style={{ marginBottom: "12px" }}>
-                                        <div style={{ fontWeight: 600, marginBottom: "4px", color: "#888888" }}>Treasure Mode:</div>
-                                        <div>Hit 30 days of consistency and we'll send you $10 cash.</div>
-                                      </div>
-                                      <div style={{ marginBottom: "12px" }}>
-                                        <div style={{ fontWeight: 600, marginBottom: "4px", color: "#888888" }}>Challenge a Friend:</div>
-                                        <div>Set a bet with your friend. Whoever is most consistent takes home the $.</div>
-                                      </div>
-                                      <div>
-                                        <div style={{ fontWeight: 600, marginBottom: "4px", color: "#888888" }}>XP Unlock:</div>
-                                        <div>Earn extra points for each completed task and unlock real rewards from our partners.</div>
-                                      </div>
-                                    </>
+                                    <div style={{ fontWeight: 700, color: "#c0c0c0", fontSize: "12px", letterSpacing: "0.5px" }}>✦ Everything in Protagonist + Hero, plus more</div>
                                   ) : (
                                     <div>Unlock after month 1</div>
                                   )}
@@ -1018,19 +1005,9 @@ function SignupContent() {
                                       </div>
                                     </div>
                                   ) : tier.mode === 3 ? (
-                                    <div style={{ fontSize: "13px", color: "#b0b0b0", fontFamily: "'Helvetica Neue', -apple-system, system-ui, sans-serif", textAlign: "left", lineHeight: "1.6" }}>
-                                      <div style={{ marginBottom: "12px" }}>
-                                        <div style={{ fontWeight: 600, marginBottom: "4px", color: "#888888" }}>Treasure Mode:</div>
-                                        <div>Hit 30 days of consistency and we'll send you $10 cash.</div>
-                                      </div>
-                                      <div style={{ marginBottom: "12px" }}>
-                                        <div style={{ fontWeight: 600, marginBottom: "4px", color: "#888888" }}>Challenge a Friend:</div>
-                                        <div>Set a bet with your friend. Whoever is most consistent takes home the $.</div>
-                                      </div>
-                                      <div>
-                                        <div style={{ fontWeight: 600, marginBottom: "4px", color: "#888888" }}>XP Unlock:</div>
-                                        <div>Earn extra points for each completed task and unlock real rewards from our partners.</div>
-                                      </div>
+                                    <div style={{ fontSize: "13px", color: "#b0b0b0", fontFamily: "'Helvetica Neue', -apple-system, system-ui, sans-serif", textAlign: "center", lineHeight: "1.7" }}>
+                                      <div style={{ fontWeight: 700, color: "#d0d0d0", fontSize: "15px", marginBottom: "8px" }}>For those who don't do things halfway.</div>
+                                      <div style={{ color: "#999999" }}>More on the line. More reason to show up. Everything from the other tiers — with higher stakes and higher returns.</div>
                                     </div>
                                   ) : (
                                     <div style={{ fontSize: "13px", color: "#ef4444", fontWeight: 600, fontFamily: "'Helvetica Neue', -apple-system, system-ui, sans-serif" }}>
