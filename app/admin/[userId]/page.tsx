@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -20,6 +20,7 @@ import {
   Hourglass,
   AlertCircle,
   ShieldCheck,
+  Save,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -437,19 +438,14 @@ export default function AdminUserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
+  const [proofMethodDraft, setProofMethodDraft] = useState("");
+  const [savingProofMethod, setSavingProofMethod] = useState(false);
+  const [proofMethodError, setProofMethodError] = useState<string | null>(null);
 
   const userId = params?.userId;
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!authUser) {
-      router.push(`/login?redirect=/admin/${userId}`);
-      return;
-    }
-    if (userId) load();
-  }, [authLoading, authUser, userId]);
-
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (!userId) return;
     try {
       setLoading(true);
       setError(null);
@@ -477,7 +473,66 @@ export default function AdminUserDetailPage() {
     } finally {
       setLoading(false);
     }
+  }, [router, userId]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!authUser) {
+      router.push(`/login?redirect=/admin/${userId}`);
+      return;
+    }
+    if (userId) load();
+  }, [authLoading, authUser, userId, load, router]);
+
+  useEffect(() => {
+    if (data?.currentChallenge?.challengeId) {
+      setProofMethodDraft(data.currentChallenge.proofMethod ?? "");
+      setProofMethodError(null);
+    }
+  }, [data?.currentChallenge?.challengeId]);
+
+  const saveProofMethod = async () => {
+    if (!data?.currentChallenge || !userId) return;
+    setSavingProofMethod(true);
+    setProofMethodError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/challenges/${data.currentChallenge.challengeId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            proofMethod: proofMethodDraft,
+            userId,
+          }),
+        }
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to save proof method");
+      }
+      setData((prev) => {
+        if (!prev?.currentChallenge) return prev;
+        return {
+          ...prev,
+          currentChallenge: {
+            ...prev.currentChallenge,
+            proofMethod: json.proofMethod,
+            updatedAt: json.updatedAt,
+          },
+        };
+      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Save failed";
+      setProofMethodError(msg);
+    } finally {
+      setSavingProofMethod(false);
+    }
   };
+
+  const proofMethodDirty =
+    !!data?.currentChallenge &&
+    proofMethodDraft !== (data.currentChallenge.proofMethod ?? "");
 
   if (authLoading || loading) {
     return (
@@ -1007,11 +1062,135 @@ export default function AdminUserDetailPage() {
                       label="Deadline"
                       value={currentChallenge.deadlineTime}
                     />
-                    <InfoRow
-                      icon={<Sparkles size={14} />}
-                      label="Proof Method"
-                      value={currentChallenge.proofMethod}
+                  </div>
+
+                  {/* Editable proof method */}
+                  <div
+                    style={{
+                      marginTop: 20,
+                      paddingTop: 20,
+                      borderTop: "1px solid rgba(255,255,255,0.06)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          backgroundColor: "rgba(255,255,255,0.03)",
+                          border: "1px solid rgba(255,255,255,0.05)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#888",
+                        }}
+                      >
+                        <Sparkles size={14} />
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "1.4px",
+                          textTransform: "uppercase",
+                          color: "#666",
+                          fontFamily: FONT_HEADING,
+                        }}
+                      >
+                        Proof method
+                      </div>
+                    </div>
+                    <textarea
+                      value={proofMethodDraft}
+                      onChange={(e) => setProofMethodDraft(e.target.value)}
+                      rows={4}
+                      placeholder="How the user proves completion…"
+                      style={{
+                        width: "100%",
+                        resize: "vertical",
+                        minHeight: 96,
+                        padding: "14px 16px",
+                        borderRadius: 12,
+                        backgroundColor: "rgba(0,0,0,0.35)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "#e0e0e0",
+                        fontSize: 14,
+                        fontFamily: FONT_BODY,
+                        lineHeight: 1.5,
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                      className="focus:border-white/15"
                     />
+                    <div
+                      className="flex flex-wrap items-center gap-3 mt-3"
+                      style={{ fontFamily: FONT_BODY }}
+                    >
+                      <button
+                        type="button"
+                        onClick={saveProofMethod}
+                        disabled={!proofMethodDirty || savingProofMethod}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "10px 18px",
+                          borderRadius: 12,
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor:
+                            !proofMethodDirty || savingProofMethod
+                              ? "not-allowed"
+                              : "pointer",
+                          backgroundColor:
+                            !proofMethodDirty || savingProofMethod
+                              ? "rgba(255,255,255,0.06)"
+                              : "#e0e0e0",
+                          color:
+                            !proofMethodDirty || savingProofMethod
+                              ? "#666"
+                              : "#1a1a1a",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                        }}
+                      >
+                        {savingProofMethod ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Saving…
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save proof method
+                          </>
+                        )}
+                      </button>
+                      {proofMethodDirty && !savingProofMethod && (
+                        <span style={{ color: "#888", fontSize: 12 }}>
+                          Unsaved changes
+                        </span>
+                      )}
+                    </div>
+                    {proofMethodError && (
+                      <p
+                        style={{
+                          color: "#fca5a5",
+                          fontSize: 13,
+                          marginTop: 10,
+                          fontFamily: FONT_BODY,
+                        }}
+                      >
+                        {proofMethodError}
+                      </p>
+                    )}
                   </div>
                 </Panel>
 
